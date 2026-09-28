@@ -43,7 +43,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" className={`${outfit.variable} scroll-smooth`}>
-      <body className="bg-zinc-950 text-zinc-100 antialiased font-sans selection:bg-orange-500 selection:text-zinc-950">
+      <body className="bg-[#FFF9F0] text-[#14301F] antialiased font-sans selection:bg-[#D9F24F] selection:text-[#14301F]">
         <CartProvider>
           <Intro />
           <BurgerCursor />

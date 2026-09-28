@@ -34,7 +34,7 @@ export default function LocationContact() {
   };
 
   return (
-    <section id="contacto" className="py-20 bg-zinc-900/60 border-t border-zinc-800/80 relative">
+    <section id="contacto" className="py-20 bg-[#F5EBD9] border-t border-[#14532D]/15 relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Title */}
         <div className="text-center max-w-3xl mx-auto mb-12 space-y-3">

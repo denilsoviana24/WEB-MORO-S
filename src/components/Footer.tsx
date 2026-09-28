@@ -8,9 +8,9 @@ import { RESTAURANT_INFO } from '@/data/menuData';
 
 export default function Footer() {
   return (
-    <footer className="bg-zinc-950 border-t border-zinc-900 text-zinc-400 pt-16 pb-8">
+    <footer className="bg-[#0C3A20] text-[#FFF9F0]/80 pt-16 pb-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 pb-12 border-b border-zinc-900">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 pb-12 border-b border-white/15">
           {/* Brand Info */}
           <div className="space-y-4">
             <Link href="/" className="flex items-center gap-3">

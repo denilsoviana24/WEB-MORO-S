@@ -20,7 +20,7 @@ export default function AnatomySection() {
   const rotate = useTransform(scrollYProgress, [0, 1], [-4, 4]);
 
   return (
-    <section ref={ref} className="py-20 bg-zinc-900/50 border-y border-zinc-800/80 relative overflow-hidden">
+    <section ref={ref} className="py-20 bg-[#F5EBD9] border-y border-[#14532D]/15 relative overflow-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <Reveal className="text-center max-w-3xl mx-auto">
           <p className="text-[11px] font-bold tracking-[0.3em] uppercase text-amber-400">Anatomía</p>
