@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
+import { motion } from 'framer-motion';
 import { CATEGORIES, MENU_ITEMS, MenuItem } from '@/data/menuData';
 import MenuCard from './MenuCard';
+import Reveal from './Reveal';
 import ProductModal from './ProductModal';
 import { Search, Utensils, SlidersHorizontal, Sparkles } from 'lucide-react';
 
@@ -32,7 +34,8 @@ export default function MenuSection() {
     <section id="menu" className="py-16 bg-zinc-950 relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
-        <div className="text-center max-w-3xl mx-auto mb-10 space-y-3">
+        <Reveal className="text-center max-w-3xl mx-auto mb-10 space-y-3">
+          <p className="text-[11px] font-bold tracking-[0.3em] uppercase text-amber-400">02 — Nuestro menú oficial</p>
           <div className="inline-flex items-center gap-2 bg-gradient-to-r from-orange-500/20 to-amber-500/20 border border-orange-500/30 px-4 py-1 rounded-full text-xs font-black text-amber-400">
             <Utensils className="w-4 h-4 text-orange-500" />
             <span>NUESTRO MENÚ OFICIAL</span>
@@ -43,7 +46,7 @@ export default function MenuSection() {
           <p className="text-zinc-400 text-sm sm:text-base leading-relaxed">
             Explora nuestra variedad de platos preparados con insumos frescos al instante. Selecciona tus favoritos y ordénalos por WhatsApp.
           </p>
-        </div>
+        </Reveal>
 
         {/* Search & Sort Bar */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8 bg-zinc-900/80 p-4 rounded-2xl border border-zinc-800 backdrop-blur-md">
@@ -120,12 +123,19 @@ export default function MenuSection() {
         {/* Menu Grid */}
         {filteredItems.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredItems.map((item) => (
-              <MenuCard
+            {filteredItems.map((item, i) => (
+              <motion.div
                 key={item.id}
-                item={item}
-                onOpenModal={(selected) => setActiveModalItem(selected)}
-              />
+                initial={{ opacity: 0, y: 28 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: '-40px' }}
+                transition={{ duration: 0.5, delay: (i % 4) * 0.07 }}
+              >
+                <MenuCard
+                  item={item}
+                  onOpenModal={(selected) => setActiveModalItem(selected)}
+                />
+              </motion.div>
             ))}
           </div>
         ) : (
