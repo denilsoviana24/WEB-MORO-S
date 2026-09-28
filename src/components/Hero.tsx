@@ -98,10 +98,14 @@ export default function Hero() {
           <p className="mt-4 text-[11px] font-bold tracking-widest uppercase text-zinc-500">
             Mueve el mouse — los platos flotan en 3D
           </p>
-          <a href="#menu" className="mt-2 inline-flex items-center gap-2 text-xs font-bold text-zinc-500 hover:text-amber-400 transition-colors">
-            <ArrowDown className="w-4 h-4" />
+          <div className="mt-4 w-24 mx-auto">
+            <div className="h-0.5 bg-gradient-to-r from-transparent via-amber-400 to-transparent rounded-full overflow-hidden">
+              <div className="h-full w-full animate-scroll-line" />
+            </div>
+          </div>
+          <p className="mt-1 text-[10px] font-medium tracking-widest uppercase text-zinc-600">
             Desliza para descubrir el sabor
-          </a>
+          </p>
         </motion.div>
 
         {/* 3 platos */}

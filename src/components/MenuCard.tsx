@@ -33,7 +33,7 @@ export default function MenuCard({ item, onOpenModal }: MenuCardProps) {
   return (
     <div
       onClick={() => onOpenModal(item)}
-      className="group relative bg-zinc-900/90 border border-zinc-800/90 hover:border-orange-500/50 rounded-2xl overflow-hidden shadow-lg hover:shadow-[0_0_25px_rgba(255,85,0,0.15)] transition-all duration-300 flex flex-col justify-between cursor-pointer"
+      className="group relative bg-zinc-900/90 border border-zinc-800/90 hover:border-orange-500/50 rounded-2xl overflow-hidden shadow-lg hover:shadow-[0_20px_40px_rgba(255,85,0,0.25)] transition-all duration-500 hover:-translate-y-2 flex flex-col justify-between cursor-pointer"
     >
       <div>
         {/* Product Image */}
@@ -43,7 +43,7 @@ export default function MenuCard({ item, onOpenModal }: MenuCardProps) {
             alt={item.name}
             fill
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-            className="object-cover group-hover:scale-105 transition-transform duration-500"
+            className="object-cover group-hover:scale-108 transition-transform duration-500"
             onError={() => {
               if (imgSrc !== '/images/hero.jpg') setImgSrc('/images/hero.jpg');
             }}
