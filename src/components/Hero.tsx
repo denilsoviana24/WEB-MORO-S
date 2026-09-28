@@ -2,10 +2,8 @@
 
 import React, { useRef } from 'react';
 import Image from 'next/image';
-import Link from 'next/link';
 import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion';
-import { Flame, ChevronRight, ShoppingBag } from 'lucide-react';
-import { RESTAURANT_INFO, MENU_ITEMS } from '@/data/menuData';
+import { MENU_ITEMS } from '@/data/menuData';
 
 const LEFT_DISH = MENU_ITEMS.find((m) => m.id === 'broaster-1')?.image || '/images/hero.jpg';
 const CENTER_DISH = '/images/hero.jpg';
@@ -91,37 +89,6 @@ export default function Hero() {
           <h1 className="text-5xl sm:text-7xl lg:text-8xl font-black leading-[0.95] tracking-tight uppercase">
             <span className="bg-gradient-to-r from-orange-500 via-amber-400 to-yellow-400 bg-clip-text text-transparent">Irresistible</span>
           </h1>
-
-          <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link
-              href="#menu"
-              className="w-full sm:w-auto flex items-center justify-center gap-3 bg-gradient-to-r from-orange-600 via-amber-500 to-orange-500 text-zinc-950 font-black px-8 py-4 rounded-2xl shadow-[0_0_30px_rgba(255,85,0,0.4)] hover:scale-105 active:scale-95 transition-all"
-            >
-              <ShoppingBag className="w-5 h-5" />
-              <span>VER MENÚ Y PEDIR</span>
-              <ChevronRight className="w-5 h-5" />
-            </Link>
-            <a
-              href={`https://wa.me/${RESTAURANT_INFO.whatsappFormatted}?text=Hola%20Moro's!%20Deseo%20hacer%20un%20pedido`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full sm:w-auto flex items-center justify-center gap-2 bg-zinc-900 hover:bg-zinc-800 text-emerald-400 border border-emerald-500/40 font-bold px-7 py-4 rounded-2xl transition-all"
-            >
-              📲 Pedir por WhatsApp
-            </a>
-          </div>
-
-          <p className="mt-4 text-[11px] font-bold tracking-widest uppercase text-zinc-500">
-            Mueve el mouse — los platos flotan en 3D
-          </p>
-          <div className="mt-4 w-24 mx-auto">
-            <div className="h-0.5 bg-gradient-to-r from-transparent via-amber-400 to-transparent rounded-full overflow-hidden">
-              <div className="h-full w-full animate-scroll-line" />
-            </div>
-          </div>
-          <p className="mt-1 text-[10px] font-medium tracking-widest uppercase text-zinc-600">
-            Desliza para descubrir el sabor
-          </p>
         </motion.div>
 
         {/* 3 platos flotantes */}
