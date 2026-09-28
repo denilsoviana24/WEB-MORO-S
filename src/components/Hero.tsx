@@ -55,6 +55,22 @@ export default function Hero() {
       className="relative overflow-hidden bg-zinc-950 border-b border-zinc-900"
       style={{ perspective: 1200 }}
     >
+      {/* Fondo: fachada del local */}
+      <div className="absolute inset-0">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/hero-fachada.jpg"
+          alt=""
+          aria-hidden="true"
+          className="w-full h-full object-cover object-center"
+          onError={(e) => {
+            e.currentTarget.style.display = 'none';
+          }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-zinc-950/90 via-zinc-950/75 to-zinc-950/95" />
+        <div className="absolute inset-0 bg-zinc-950/35" />
+      </div>
+
       {/* Blobs de fondo */}
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute -top-24 -left-24 w-96 h-96 bg-orange-600/20 rounded-full blur-[110px]" />
