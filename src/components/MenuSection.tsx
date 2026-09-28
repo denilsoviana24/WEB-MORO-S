@@ -13,6 +13,9 @@ export default function MenuSection() {
   const [activeModalItem, setActiveModalItem] = useState<MenuItem | null>(null);
   // Carrusel: una categoría a la vez
   const [activeCatIndex, setActiveCatIndex] = useState(0);
+  // Plato destacado giratorio dentro de cada categoría
+  const [showcaseIndex, setShowcaseIndex] = useState(0);
+  const [spinning, setSpinning] = useState(false);
   const rowRef = useRef<HTMLDivElement>(null);
 
   const searchFiltered = useMemo(() => {
@@ -36,9 +39,24 @@ export default function MenuSection() {
 
   const activeGroup = grouped[activeCatIndex] || grouped[0];
 
-  const prevCat = () =>
+  const prevCat = () => {
     setActiveCatIndex((i) => (i - 1 + grouped.length) % grouped.length);
-  const nextCat = () => setActiveCatIndex((i) => (i + 1) % grouped.length);
+    setShowcaseIndex(0);
+  };
+  const nextCat = () => {
+    setActiveCatIndex((i) => (i + 1) % grouped.length);
+    setShowcaseIndex(0);
+  };
+
+  // Girar y cambiar al siguiente plato
+  const spinToNextDish = () => {
+    if (spinning) return;
+    setSpinning(true);
+    setTimeout(() => {
+      setShowcaseIndex((i) => (i + 1) % (activeGroup?.items.length || 1));
+      setTimeout(() => setSpinning(false), 350);
+    }, 250);
+  };
 
   const scrollRow = (dir: 1 | -1) => {
     rowRef.current?.scrollBy({ left: dir * 320, behavior: 'smooth' });
@@ -122,7 +140,7 @@ export default function MenuSection() {
               {grouped.map((g, i) => (
                 <button
                   key={g.cat.id}
-                  onClick={() => setActiveCatIndex(i)}
+                  onClick={() => { setActiveCatIndex(i); setShowcaseIndex(0); }}
                   className={`snap-start shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all border ${
                     i === activeCatIndex
                       ? 'bg-gradient-to-r from-orange-600 to-amber-500 text-zinc-950 border-amber-400 shadow-[0_0_15px_rgba(255,85,0,0.3)] scale-105'
@@ -184,23 +202,48 @@ export default function MenuSection() {
                       </button>
                     </div>
                   </div>
-                  {/* Plato circular con órbita derecha */}
+                  {/* Plato circular GIRATORIO: al señalarlo gira y cambia al siguiente */}
                   <div className="relative mx-auto w-56 h-56 sm:w-72 sm:h-72">
                     <div className="absolute inset-0 rounded-full border border-amber-400/30" />
                     <div className="absolute inset-4 rounded-full border border-dashed border-amber-400/20" />
-                    <div className="absolute inset-8 rounded-full overflow-hidden border-2 border-amber-400/40 shadow-[0_0_50px_rgba(255,150,0,0.3)] bg-zinc-900">
+                    <motion.button
+                      onMouseEnter={spinToNextDish}
+                      onClick={spinToNextDish}
+                      animate={{ rotate: spinning ? 360 : 0, scale: spinning ? 0.92 : 1 }}
+                      transition={{ duration: 0.6, ease: 'easeInOut' }}
+                      title="Toca o pasa el mouse para ver otro plato"
+                      className="absolute inset-8 rounded-full overflow-hidden border-2 border-amber-400/40 shadow-[0_0_50px_rgba(255,150,0,0.3)] bg-zinc-900 cursor-pointer"
+                    >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
-                        src={activeGroup.items[0]?.image || '/images/hero.jpg'}
-                        alt={activeGroup.cat.name}
+                        key={activeGroup.items[showcaseIndex % activeGroup.items.length]?.id}
+                        src={activeGroup.items[showcaseIndex % activeGroup.items.length]?.image || '/images/hero.jpg'}
+                        alt={activeGroup.items[showcaseIndex % activeGroup.items.length]?.name || activeGroup.cat.name}
                         className="w-full h-full object-cover"
                       />
-                    </div>
-                    {/* Mini ingredientes orbitando */}
-                    {activeGroup.items.slice(1, 4).map((mini, mi) => (
-                      <div
+                      <span className="absolute inset-0 flex items-center justify-center bg-zinc-950/0 hover:bg-zinc-950/30 transition-colors">
+                        <span className="opacity-0 hover:opacity-100 text-[11px] font-black bg-zinc-950/90 text-amber-400 px-3 py-1.5 rounded-full border border-amber-400/50">
+                          ↻ Girar para otro plato
+                        </span>
+                      </span>
+                    </motion.button>
+                    {/* Nombre del plato destacado */}
+                    <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap max-w-[240px] truncate bg-zinc-950 border border-amber-400/50 text-amber-400 text-[11px] font-black px-3 py-1 rounded-full">
+                      {activeGroup.items[showcaseIndex % activeGroup.items.length]?.name}
+                    </span>
+                    {/* Mini platos clicables para saltar directo */}
+                    {activeGroup.items.slice(0, 3).map((mini, mi) => (
+                      <button
                         key={mini.id}
-                        className="absolute w-12 h-12 rounded-full overflow-hidden border-2 border-zinc-950 shadow-xl bg-zinc-900"
+                        onClick={() => {
+                          setShowcaseIndex(mi % activeGroup.items.length);
+                        }}
+                        title={mini.name}
+                        className={`absolute w-12 h-12 rounded-full overflow-hidden border-2 shadow-xl bg-zinc-900 transition-all hover:scale-110 ${
+                          (showcaseIndex % activeGroup.items.length) === mi
+                            ? 'border-amber-400'
+                            : 'border-zinc-950'
+                        }`}
                         style={{
                           top: ['6%', '42%', '74%'][mi],
                           left: ['74%', '88%', '70%'][mi],
@@ -208,9 +251,9 @@ export default function MenuSection() {
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={mini.image} alt={mini.name} className="w-full h-full object-cover" />
-                      </div>
+                      </button>
                     ))}
-                    <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 whitespace-nowrap bg-zinc-950 border border-amber-400/50 text-amber-400 text-[11px] font-black px-3 py-1 rounded-full">
+                    <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 whitespace-nowrap bg-zinc-950 border border-amber-400/50 text-amber-400 text-[11px] font-black px-3 py-1 rounded-full hidden">
                       {activeGroup.cat.icon} {activeGroup.items.length} platos
                     </span>
                   </div>
@@ -266,7 +309,7 @@ export default function MenuSection() {
               {grouped.map((g, i) => (
                 <button
                   key={g.cat.id}
-                  onClick={() => setActiveCatIndex(i)}
+                  onClick={() => { setActiveCatIndex(i); setShowcaseIndex(0); }}
                   aria-label={g.cat.name}
                   className={`h-2 rounded-full transition-all ${
                     i === activeCatIndex ? 'w-8 bg-gradient-to-r from-orange-600 to-amber-400' : 'w-2 bg-zinc-700 hover:bg-zinc-500'
@@ -276,7 +319,7 @@ export default function MenuSection() {
             </div>
 
             <button
-              onClick={() => setActiveCatIndex((i) => (i + 1) % grouped.length)}
+              onClick={() => { setActiveCatIndex((i) => (i + 1) % grouped.length); setShowcaseIndex(0); }}
               className="mt-6 mx-auto flex items-center gap-2 text-xs font-black text-amber-400 hover:text-amber-300 transition-colors"
             >
               Ver siguiente categoría: {grouped[(activeCatIndex + 1) % grouped.length].cat.name}
