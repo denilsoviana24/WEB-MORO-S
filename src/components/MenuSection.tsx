@@ -142,7 +142,7 @@ export default function MenuSection() {
               ))}
             </div>
 
-            {/* Cabecera de categoría activa con flechas */}
+            {/* Cabecera estilo Foodluck por categoría: texto elegante + plato circular con órbita */}
             <AnimatePresence mode="wait">
               <motion.div
                 key={activeGroup.cat.id}
@@ -150,27 +150,71 @@ export default function MenuSection() {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -40 }}
                 transition={{ duration: 0.3 }}
-                className="flex items-center justify-between gap-4 bg-zinc-900/60 border border-zinc-800 rounded-3xl px-5 sm:px-7 py-5 mb-6"
+                className="relative overflow-hidden rounded-3xl border border-amber-400/20 bg-[#0c0a09] px-6 sm:px-10 py-8 mb-6"
               >
-                <button
-                  onClick={prevCat}
-                  aria-label="Categoría anterior"
-                  className="shrink-0 p-3 rounded-2xl bg-zinc-950 border border-zinc-700 text-amber-400 hover:border-amber-400 transition-colors"
-                >
-                  <ChevronLeft className="w-5 h-5" />
-                </button>
-                <div className="text-center min-w-0">
-                  <p className="text-3xl">{activeGroup.cat.icon}</p>
-                  <h3 className="font-black text-white text-xl sm:text-2xl">{activeGroup.cat.name}</h3>
-                  <p className="text-zinc-400 text-xs mt-1">{activeGroup.cat.description}</p>
+                <div className="absolute -top-20 -left-20 w-72 h-72 bg-amber-500/10 rounded-full blur-[90px] pointer-events-none" />
+                <div className="relative grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                  {/* Texto elegante izquierda */}
+                  <div className="text-center md:text-left">
+                    <p className="font-serif italic text-amber-400/90 text-sm">Moro&apos;s · {activeGroup.cat.icon} {activeGroup.items.length} platos</p>
+                    <h3 className="mt-2 font-serif text-3xl sm:text-4xl text-white leading-tight">{activeGroup.cat.name}</h3>
+                    <p className="mt-3 text-zinc-400 text-xs sm:text-sm leading-relaxed max-w-md mx-auto md:mx-0">
+                      {activeGroup.cat.description}
+                    </p>
+                    <div className="mt-5 flex items-center justify-center md:justify-start gap-3">
+                      <button
+                        onClick={prevCat}
+                        aria-label="Categoría anterior"
+                        className="p-2.5 rounded-full bg-zinc-900 border border-zinc-700 text-amber-400 hover:border-amber-400 transition-colors"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => rowRef.current?.scrollBy({ left: 320, behavior: 'smooth' })}
+                        className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-zinc-950 font-black text-xs px-6 py-3 rounded-full shadow-[0_0_25px_rgba(255,150,0,0.35)] transition-all"
+                      >
+                        Ver platos ↓
+                      </button>
+                      <button
+                        onClick={nextCat}
+                        aria-label="Siguiente categoría"
+                        className="p-2.5 rounded-full bg-gradient-to-r from-orange-600 to-amber-500 text-zinc-950 hover:scale-105 transition-transform"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                  {/* Plato circular con órbita derecha */}
+                  <div className="relative mx-auto w-56 h-56 sm:w-72 sm:h-72">
+                    <div className="absolute inset-0 rounded-full border border-amber-400/30" />
+                    <div className="absolute inset-4 rounded-full border border-dashed border-amber-400/20" />
+                    <div className="absolute inset-8 rounded-full overflow-hidden border-2 border-amber-400/40 shadow-[0_0_50px_rgba(255,150,0,0.3)] bg-zinc-900">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={activeGroup.items[0]?.image || '/images/hero.jpg'}
+                        alt={activeGroup.cat.name}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    {/* Mini ingredientes orbitando */}
+                    {activeGroup.items.slice(1, 4).map((mini, mi) => (
+                      <div
+                        key={mini.id}
+                        className="absolute w-12 h-12 rounded-full overflow-hidden border-2 border-zinc-950 shadow-xl bg-zinc-900"
+                        style={{
+                          top: ['6%', '42%', '74%'][mi],
+                          left: ['74%', '88%', '70%'][mi],
+                        }}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={mini.image} alt={mini.name} className="w-full h-full object-cover" />
+                      </div>
+                    ))}
+                    <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 whitespace-nowrap bg-zinc-950 border border-amber-400/50 text-amber-400 text-[11px] font-black px-3 py-1 rounded-full">
+                      {activeGroup.cat.icon} {activeGroup.items.length} platos
+                    </span>
+                  </div>
                 </div>
-                <button
-                  onClick={nextCat}
-                  aria-label="Siguiente categoría"
-                  className="shrink-0 p-3 rounded-2xl bg-gradient-to-r from-orange-600 to-amber-500 text-zinc-950 hover:scale-105 transition-transform"
-                >
-                  <ChevronRight className="w-5 h-5" />
-                </button>
               </motion.div>
             </AnimatePresence>
 
