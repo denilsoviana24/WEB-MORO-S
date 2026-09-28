@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { ShoppingBag, Phone, Menu, X, Clock, MapPin, MessageCircle } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { RESTAURANT_INFO } from '@/data/menuData';
+import Logo from '@/components/Logo';
 
 export default function Header() {
   const { totalItems, setIsCartOpen } = useCart();
@@ -51,18 +52,9 @@ export default function Header() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
         {/* Brand Logo */}
         <Link href="/" className="flex items-center gap-3 group">
-          <div className="relative w-12 h-12 rounded-full overflow-hidden border-2 border-[#14532D] shadow-[0_0_15px_rgba(20,83,45,0.25)] group-hover:scale-105 transition-transform bg-white">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/logo-moros.png"
-              alt="Moro's Comidas Rápidas Logo"
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                const t = e.currentTarget;
-                if (!t.src.includes('logo.svg')) t.src = '/logo.svg';
-              }}
-            />
-          </div>
+          <span className="block rounded-full border-2 border-[#14532D] shadow-[0_0_15px_rgba(20,83,45,0.25)] group-hover:scale-105 transition-transform">
+            <Logo className="h-12 w-12" />
+          </span>
           <div className="flex flex-col">
             <span className="font-extrabold text-xl sm:text-2xl text-[#14301F] tracking-wide group-hover:text-[#14532D] transition-colors">
               MORO&apos;S

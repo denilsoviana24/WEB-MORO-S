@@ -1,10 +1,10 @@
 'use client';
 
 import React from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { MapPin, Phone, Mail, Clock, MessageCircle, Heart } from 'lucide-react';
 import { RESTAURANT_INFO } from '@/data/menuData';
+import Logo from '@/components/Logo';
 
 export default function Footer() {
   return (
@@ -14,18 +14,9 @@ export default function Footer() {
           {/* Brand Info */}
           <div className="space-y-4">
             <Link href="/" className="flex items-center gap-3">
-              <div className="relative w-12 h-12 rounded-full overflow-hidden border-2 border-orange-500 bg-zinc-900">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="/logo-moros.png"
-                  alt="Moro's Comidas Rápidas Logo"
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    const t = e.currentTarget;
-                    if (!t.src.includes('logo.svg')) t.src = '/logo.svg';
-                  }}
-                />
-              </div>
+              <span className="block rounded-full border-2 border-[#F04E23]">
+                <Logo className="h-12 w-12" />
+              </span>
               <div className="flex flex-col">
                 <span className="font-black text-2xl text-white tracking-wide">
                   MORO&apos;S
