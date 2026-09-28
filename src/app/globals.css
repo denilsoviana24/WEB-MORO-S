@@ -80,3 +80,13 @@ body {
   -webkit-text-stroke: 1.5px rgba(251, 191, 36, 0.7);
   color: transparent;
 }
+
+/* ——— Cursor hamburguesa: oculta flecha nativa solo en PC con mouse ——— */
+@media (hover: hover) and (pointer: fine) {
+  body, a, button, [role="button"] {
+    cursor: none !important;
+  }
+  input, textarea, select {
+    cursor: auto !important;
+  }
+}
