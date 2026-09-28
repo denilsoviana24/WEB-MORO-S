@@ -7,17 +7,48 @@ const LETTERS = ['M', 'O', 'R', 'O', '’', 'S'];
 
 export default function Intro() {
   const [show, setShow] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [eatenCount, setEatenCount] = useState(0);
+  const [chomp, setChomp] = useState(false);
+
+  const eating = progress >= 100;
 
   useEffect(() => {
-    // Mostrar solo una vez por sesión
     try {
       if (sessionStorage.getItem('moros-intro-seen')) return;
     } catch {
-      // sessionStorage no disponible, mostrar igual
+      // ignorar
     }
     setShow(true);
-    // Bloquear scroll durante la intro
     document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, []);
+
+  // Carga 0 → 100
+  useEffect(() => {
+    if (!show || progress >= 100) return;
+    const t = setTimeout(() => {
+      setProgress((p) => Math.min(100, p + Math.floor(Math.random() * 9) + 4));
+    }, 110);
+    return () => clearTimeout(t);
+  }, [show, progress]);
+
+  // La hamburguesa se come las letras una por una (de derecha a izquierda)
+  useEffect(() => {
+    if (!show || !eating || eatenCount >= LETTERS.length) return;
+    setChomp(true);
+    const t = setTimeout(() => {
+      setEatenCount((c) => c + 1);
+      setChomp(false);
+    }, 320);
+    return () => clearTimeout(t);
+  }, [show, eating, eatenCount]);
+
+  // Salir cuando termina de comer
+  useEffect(() => {
+    if (!show || eatenCount < LETTERS.length) return;
     const t = setTimeout(() => {
       setShow(false);
       document.body.style.overflow = '';
@@ -26,12 +57,9 @@ export default function Intro() {
       } catch {
         // ignorar
       }
-    }, 3200);
-    return () => {
-      clearTimeout(t);
-      document.body.style.overflow = '';
-    };
-  }, []);
+    }, 700);
+    return () => clearTimeout(t);
+  }, [show, eatenCount]);
 
   const skip = () => {
     setShow(false);
@@ -47,67 +75,82 @@ export default function Intro() {
     <AnimatePresence>
       {show && (
         <motion.div
-          className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-zinc-950 overflow-hidden"
+          className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-zinc-950 overflow-hidden px-4"
           exit={{ y: '-100%', transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] } }}
         >
-          {/* Glow de fondo */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-orange-600/20 rounded-full blur-[120px] pointer-events-none" />
 
-          {/* Hamburguesa corriendo de izquierda al centro */}
+          {/* Hamburguesa gigante */}
           <motion.div
-            initial={{ x: '-60vw', rotate: -10 }}
-            animate={{ x: 0, rotate: 0 }}
-            transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1] }}
-            className="relative z-10 text-7xl sm:text-8xl"
+            animate={
+              eating
+                ? { x: [0, -8, 8, 0], scale: chomp ? [1, 1.25, 0.95, 1.1] : 1 }
+                : { y: [0, -12, 0] }
+            }
+            transition={eating ? { duration: 0.32 } : { duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+            className="relative z-10 text-8xl sm:text-9xl leading-none"
           >
-            <motion.span
-              animate={{ y: [0, -14, 0] }}
-              transition={{ duration: 0.35, repeat: 4, ease: 'easeInOut' }}
-              className="block"
-            >
-              🍔
-            </motion.span>
-            {/* Humo de velocidad */}
-            <motion.span
-              initial={{ opacity: 0, x: 0 }}
-              animate={{ opacity: [0, 1, 0], x: -60 }}
-              transition={{ duration: 1.1 }}
-              className="absolute top-1/2 -left-10 text-3xl"
-            >
-              💨
-            </motion.span>
+            🍔
+            {eating && (
+              <motion.span
+                initial={{ opacity: 0, scale: 0.5 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="absolute -top-2 -right-6 text-3xl"
+              >
+                😋
+              </motion.span>
+            )}
           </motion.div>
 
-          {/* Letras MORO'S apareciendo una por una */}
-          <div className="relative z-10 mt-4 flex items-end gap-1">
-            {LETTERS.map((l, i) => (
-              <motion.span
-                key={i}
-                initial={{ opacity: 0, y: 60, scale: 0.5, rotate: -10 }}
-                animate={{ opacity: 1, y: 0, scale: 1, rotate: 0 }}
-                transition={{ delay: 1.1 + i * 0.12, duration: 0.5, type: 'spring', bounce: 0.5 }}
-                className="text-5xl sm:text-7xl font-black tracking-tight bg-gradient-to-r from-orange-500 via-amber-400 to-yellow-400 bg-clip-text text-transparent"
-              >
-                {l}
-              </motion.span>
-            ))}
-          </div>
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 1.9, duration: 0.5 }}
-            className="relative z-10 mt-2 text-xs sm:text-sm font-bold tracking-[0.35em] uppercase text-zinc-400"
-          >
-            Comidas Rápidas · Tulcán
-          </motion.p>
-
-          {/* Barra de carga */}
-          <motion.div
-            initial={{ scaleX: 0 }}
-            animate={{ scaleX: 1 }}
-            transition={{ delay: 1.1, duration: 1.6, ease: 'easeInOut' }}
-            className="relative z-10 mt-8 h-1 w-48 origin-left rounded-full bg-gradient-to-r from-orange-600 to-amber-400"
-          />
+          {/* Porcentaje de carga */}
+          {!eating ? (
+            <div className="relative z-10 mt-6 text-center">
+              <p className="text-5xl font-black text-white tabular-nums">{progress}%</p>
+              <p className="mt-1 text-[11px] font-bold tracking-[0.35em] uppercase text-zinc-400">
+                Cargando sabor…
+              </p>
+              <div className="mt-4 h-2 w-56 mx-auto rounded-full bg-zinc-800 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-orange-600 to-amber-400 transition-all duration-150"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="relative z-10 mt-6 text-center">
+              {/* Letras que van siendo comidas */}
+              <div className="flex items-end justify-center gap-1 min-h-[4rem]">
+                {LETTERS.map((l, i) => {
+                  const eaten = i >= LETTERS.length - eatenCount;
+                  return (
+                    <AnimatePresence key={i} mode="popLayout">
+                      {!eaten && (
+                        <motion.span
+                          exit={{ scale: 0, y: -30, opacity: 0, rotate: 20 }}
+                          transition={{ duration: 0.25 }}
+                          className="text-5xl sm:text-6xl font-black tracking-tight bg-gradient-to-r from-orange-500 via-amber-400 to-yellow-400 bg-clip-text text-transparent"
+                        >
+                          {l}
+                        </motion.span>
+                      )}
+                    </AnimatePresence>
+                  );
+                })}
+                {eatenCount >= LETTERS.length && (
+                  <motion.span
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    className="text-5xl sm:text-6xl font-black text-amber-400"
+                  >
+                    ¡Ñam! 😋
+                  </motion.span>
+                )}
+              </div>
+              <p className="mt-2 text-[11px] font-bold tracking-[0.35em] uppercase text-zinc-400">
+                La hamburguesa se comió a Moro&apos;s
+              </p>
+            </div>
+          )}
 
           <button
             onClick={skip}
