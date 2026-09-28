@@ -1,6 +1,5 @@
 import Hero from '@/components/Hero';
 import Marquee from '@/components/Marquee';
-import PromoBanner from '@/components/PromoBanner';
 import ExperienceSection from '@/components/ExperienceSection';
 import MenuSection from '@/components/MenuSection';
 import AnatomySection from '@/components/AnatomySection';
@@ -16,7 +15,6 @@ export default function Home() {
         items={['Crujiente', 'Jugoso', 'Irresistible', '#ElSaborDeTulcán']}
         outline
       />
-      <PromoBanner />
       <ExperienceSection />
       <MenuSection />
       <Marquee
