@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { Plus, Eye, Flame, Check } from 'lucide-react';
 import { MenuItem } from '@/data/menuData';
 import { useCart } from '@/context/CartContext';
+import { flyToCartFromEvent } from '@/lib/flyToCart';
 
 interface MenuCardProps {
   item: MenuItem;
@@ -23,6 +24,7 @@ export default function MenuCard({ item, onOpenModal }: MenuCardProps) {
 
   const handleQuickAdd = (e: React.MouseEvent) => {
     e.stopPropagation();
+    flyToCartFromEvent(e, imgSrc);
     addToCart(item);
     setAddedAnimation(true);
     setTimeout(() => setAddedAnimation(false), 1200);

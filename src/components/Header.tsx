@@ -116,6 +116,7 @@ export default function Header() {
 
           {/* Cart Trigger Pill Button */}
           <button
+            id="cart-button"
             onClick={() => setIsCartOpen(true)}
             className="relative flex items-center gap-2.5 bg-gradient-to-r from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-400 text-zinc-950 font-black px-4 py-2.5 rounded-xl shadow-[0_0_20px_rgba(255,85,0,0.3)] hover:scale-105 active:scale-95 transition-all"
             aria-label="Ver Pedido"

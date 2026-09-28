@@ -71,7 +71,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         return [...prevCart, { product, quantity, selectedOption: option, notes }];
       }
     });
-    setIsCartOpen(true);
+    // Abrir con delay para que se vea la animación de volar al carrito
+    setTimeout(() => setIsCartOpen(true), 750);
   };
 
   const removeFromCart = (productId: string, optionSize?: string) => {

@@ -7,6 +7,7 @@ import Footer from '@/components/Footer';
 import CartDrawer from '@/components/CartDrawer';
 import Intro from '@/components/Intro';
 import BurgerCursor from '@/components/BurgerCursor';
+import FlyToCart from '@/components/FlyToCart';
 
 const outfit = Outfit({
   subsets: ['latin'],
@@ -46,6 +47,7 @@ export default function RootLayout({
         <CartProvider>
           <Intro />
           <BurgerCursor />
+          <FlyToCart />
           <div className="flex flex-col min-h-screen">
             <Header />
             <main className="flex-1">{children}</main>

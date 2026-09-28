@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Flame, Sparkles, PlusCircle, ChevronDown } from 'lucide-react';
 import { PROMOTIONS, MENU_ITEMS } from '@/data/menuData';
 import { useCart } from '@/context/CartContext';
+import { flyToCartFromEvent, flyToCart } from '@/lib/flyToCart';
 import Reveal from './Reveal';
 
 // Relación manual promo -> productos del menú
@@ -19,7 +20,7 @@ export default function PromoBanner() {
   const { addToCart } = useCart();
   const [openId, setOpenId] = useState<string | null>('promo-1');
 
-  const handleAddPromo = (promoId: string) => {
+  const handleAddPromo = (promoId: string, e?: React.MouseEvent, image?: string) => {
     const fallback: Record<string, string> = {
       'promo-1': 'burger-moros',
       'promo-2': 'papi-completa-broaster',
@@ -27,6 +28,8 @@ export default function PromoBanner() {
     };
     const item =
       MENU_ITEMS.find((i) => i.id === fallback[promoId]) || MENU_ITEMS[0];
+    if (e) flyToCartFromEvent(e, image || item.image);
+    else flyToCart(item.image, window.innerWidth / 2, window.innerHeight / 2);
     addToCart(item);
   };
 
@@ -122,7 +125,10 @@ export default function PromoBanner() {
                               {related.map((item) => (
                                 <button
                                   key={item!.id}
-                                  onClick={() => addToCart(item!)}
+                                  onClick={(e) => {
+                                    flyToCartFromEvent(e, item!.image);
+                                    addToCart(item!);
+                                  }}
                                   className="flex items-center gap-2 bg-zinc-900 border border-zinc-700 hover:border-orange-500 rounded-xl px-3 py-2 text-xs font-bold text-white transition-colors"
                                 >
                                   <PlusCircle className="w-3.5 h-3.5 text-orange-400" />
@@ -132,7 +138,7 @@ export default function PromoBanner() {
                             </div>
                           </div>
                           <button
-                            onClick={() => handleAddPromo(promo.id)}
+                            onClick={(e) => handleAddPromo(promo.id, e, promo.image)}
                             className="w-full bg-orange-600/10 hover:bg-orange-600 border border-orange-500/40 text-orange-400 hover:text-zinc-950 font-black py-3 px-4 rounded-xl text-xs transition-all flex items-center justify-center gap-2"
                           >
                             <PlusCircle className="w-4 h-4" />

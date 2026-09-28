@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { X, Plus, Minus, ShoppingBag, Check, MessageSquare } from 'lucide-react';
 import { MenuItem } from '@/data/menuData';
 import { useCart } from '@/context/CartContext';
+import { flyToCartFromEvent } from '@/lib/flyToCart';
 
 interface ProductModalProps {
   item: MenuItem | null;
@@ -25,7 +26,8 @@ export default function ProductModal({ item, onClose }: ProductModalProps) {
   const currentPrice = selectedOption ? selectedOption.price : item.price;
   const totalPrice = currentPrice * quantity;
 
-  const handleAddToCart = () => {
+  const handleAddToCart = (e: React.MouseEvent) => {
+    flyToCartFromEvent(e, item.image);
     addToCart(item, quantity, selectedOption, notes);
     setAdded(true);
     setTimeout(() => {
@@ -143,7 +145,7 @@ export default function ProductModal({ item, onClose }: ProductModalProps) {
           </div>
 
           <button
-            onClick={handleAddToCart}
+            onClick={(e) => handleAddToCart(e)}
             className={`flex items-center gap-2 px-6 py-3.5 rounded-2xl font-black text-sm transition-all ${
               added
                 ? 'bg-emerald-500 text-zinc-950'
