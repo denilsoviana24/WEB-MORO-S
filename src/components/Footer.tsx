@@ -8,15 +8,15 @@ import Logo from '@/components/Logo';
 
 export default function Footer() {
   return (
-    <footer className="bg-[#0C3A20] text-[#FFF9F0]/80 pt-16 pb-8">
+    <footer className="bg-zinc-950 border-t border-zinc-900 text-zinc-400 pt-16 pb-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 pb-12 border-b border-white/15">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 pb-12 border-b border-zinc-900">
           {/* Brand Info */}
           <div className="space-y-4">
             <Link href="/" className="flex items-center gap-3">
-              <span className="block rounded-full border-2 border-[#F04E23]">
+              <div className="relative w-12 h-12 rounded-full overflow-hidden border-2 border-orange-500 bg-zinc-900">
                 <Logo className="h-12 w-12" />
-              </span>
+              </div>
               <div className="flex flex-col">
                 <span className="font-black text-2xl text-white tracking-wide">
                   MORO&apos;S

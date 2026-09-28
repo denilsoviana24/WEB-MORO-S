@@ -26,9 +26,9 @@ export default function Header() {
   }, []);
 
   return (
-    <header className="sticky top-0 z-40 bg-[#FFF9F0]/90 backdrop-blur-md border-b border-[#14532D]/15 transition-all shadow-[0_8px_30px_rgba(20,83,45,0.08)]">
+    <header className="sticky top-0 z-40 bg-zinc-950/90 backdrop-blur-md border-b border-zinc-800/80 transition-all shadow-xl">
       {/* Top Banner Bar */}
-      <div className="bg-[#14532D] text-[#FFF9F0] text-xs font-bold py-1.5 px-4 text-center flex items-center justify-between gap-2 overflow-x-auto">
+      <div className="bg-gradient-to-r from-orange-600 via-amber-500 to-orange-600 text-zinc-950 text-xs font-bold py-1.5 px-4 text-center flex items-center justify-between gap-2 overflow-x-auto">
         <div className="flex items-center gap-2 mx-auto sm:mx-0">
           <MapPin className="w-3.5 h-3.5" />
           <span>{RESTAURANT_INFO.address}</span>
@@ -52,14 +52,14 @@ export default function Header() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
         {/* Brand Logo */}
         <Link href="/" className="flex items-center gap-3 group">
-          <span className="block rounded-full border-2 border-[#14532D] shadow-[0_0_15px_rgba(20,83,45,0.25)] group-hover:scale-105 transition-transform">
+          <div className="relative w-12 h-12 rounded-full overflow-hidden border-2 border-orange-500/80 shadow-[0_0_15px_rgba(255,85,0,0.4)] group-hover:scale-105 transition-transform bg-zinc-900">
             <Logo className="h-12 w-12" />
-          </span>
+          </div>
           <div className="flex flex-col">
-            <span className="font-extrabold text-xl sm:text-2xl text-[#14301F] tracking-wide group-hover:text-[#14532D] transition-colors">
+            <span className="font-extrabold text-xl sm:text-2xl text-white tracking-wide group-hover:text-orange-400 transition-colors">
               MORO&apos;S
             </span>
-            <span className="text-xs font-medium text-[#F04E23] tracking-wider uppercase flex items-center gap-1.5">
+            <span className="text-xs font-medium text-amber-400 tracking-wider uppercase flex items-center gap-1.5">
               <span>Comidas Rápidas</span>
               <span className={`w-2 h-2 rounded-full ${isOpenNow ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></span>
             </span>
@@ -67,28 +67,28 @@ export default function Header() {
         </Link>
 
         {/* Status Badge Desktop */}
-        <div className="hidden lg:flex items-center gap-2 bg-white border border-[#14532D]/15 rounded-full py-1.5 px-3.5 text-xs font-semibold">
+        <div className="hidden lg:flex items-center gap-2 bg-zinc-900/80 border border-zinc-800 rounded-full py-1.5 px-3.5 text-xs font-semibold">
           <span className={`w-2.5 h-2.5 rounded-full ${isOpenNow ? 'bg-emerald-400 animate-ping' : 'bg-red-500'}`}></span>
-          <span className={isOpenNow ? 'text-[#14532D]' : 'text-zinc-500'}>
+          <span className={isOpenNow ? 'text-emerald-400' : 'text-zinc-400'}>
             {isOpenNow ? '¡ABIERTO AHORA! (17:00 - 23:00)' : 'CERRADO (Abre 17:00)'}
           </span>
         </div>
 
         {/* Desktop Navigation Links */}
-        <nav className="hidden md:flex items-center gap-6 font-medium text-sm text-[#14301F]">
-          <Link href="/" className="hover:text-[#F04E23] transition-colors">
+        <nav className="hidden md:flex items-center gap-6 font-medium text-sm text-zinc-300">
+          <Link href="/" className="hover:text-orange-400 transition-colors">
             Inicio
           </Link>
-          <Link href="/#menu" className="hover:text-[#F04E23] transition-colors">
+          <Link href="/#menu" className="hover:text-orange-400 transition-colors">
             Menú
           </Link>
-          <Link href="/#promos" className="hover:text-[#F04E23] transition-colors flex items-center gap-1 text-[#F04E23]">
+          <Link href="/#promos" className="hover:text-orange-400 transition-colors flex items-center gap-1 text-amber-400">
             <span>🔥</span> Promociones
           </Link>
-          <Link href="/#nosotros" className="hover:text-[#F04E23] transition-colors">
+          <Link href="/#nosotros" className="hover:text-orange-400 transition-colors">
             Nosotros
           </Link>
-          <Link href="/#contacto" className="hover:text-[#F04E23] transition-colors">
+          <Link href="/#contacto" className="hover:text-orange-400 transition-colors">
             Contacto
           </Link>
         </nav>
@@ -100,7 +100,7 @@ export default function Header() {
             href={`https://wa.me/${RESTAURANT_INFO.whatsappFormatted}?text=Hola%20Moro's!%20Quiero%20hacer%20un%20pedido`}
             target="_blank"
             rel="noopener noreferrer"
-            className="hidden sm:flex items-center gap-2 bg-[#14532D]/10 hover:bg-[#14532D] text-[#14532D] hover:text-white border border-[#14532D]/30 px-3.5 py-2 rounded-full text-xs font-bold transition-all"
+            className="hidden sm:flex items-center gap-2 bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white border border-emerald-500/40 px-3.5 py-2 rounded-xl text-xs font-bold transition-all"
           >
             <MessageCircle className="w-4 h-4" />
             <span>WhatsApp</span>
@@ -110,13 +110,13 @@ export default function Header() {
           <button
             id="cart-button"
             onClick={() => setIsCartOpen(true)}
-            className="relative flex items-center gap-2.5 bg-[#F04E23] hover:bg-[#d63f18] text-white font-black px-4 py-2.5 rounded-full shadow-[0_8px_20px_rgba(240,78,35,0.35)] hover:scale-105 active:scale-95 transition-all"
+            className="relative flex items-center gap-2.5 bg-gradient-to-r from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-400 text-zinc-950 font-black px-4 py-2.5 rounded-xl shadow-[0_0_20px_rgba(255,85,0,0.3)] hover:scale-105 active:scale-95 transition-all"
             aria-label="Ver Pedido"
           >
-            <ShoppingBag className="w-5 h-5 text-white" />
+            <ShoppingBag className="w-5 h-5 text-zinc-950" />
             <span className="hidden sm:inline">Mi Pedido</span>
             {totalItems > 0 && (
-              <span className="bg-white text-[#F04E23] text-xs font-black rounded-full h-5 w-5 flex items-center justify-center">
+              <span className="bg-zinc-950 text-orange-400 text-xs font-black rounded-full h-5 w-5 flex items-center justify-center border border-amber-400/50">
                 {totalItems}
               </span>
             )}
@@ -125,7 +125,7 @@ export default function Header() {
           {/* Mobile Menu Toggle */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden p-2 rounded-lg bg-white border border-[#14532D]/20 text-[#14301F]"
+            className="md:hidden p-2 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white"
             aria-label="Abrir Menú"
           >
             {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -135,9 +135,9 @@ export default function Header() {
 
       {/* Mobile Drawer Menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden bg-[#FFF9F0] border-b border-[#14532D]/15 px-4 pt-4 pb-6 space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-[#14532D]/15">
-            <span className="text-xs font-bold text-[#14532D]/70 uppercase tracking-wider">Estado del local</span>
+        <div className="md:hidden bg-zinc-950/95 border-b border-zinc-800 px-4 pt-4 pb-6 space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+            <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Estado del local</span>
             <span className={`text-xs font-black px-2.5 py-1 rounded-full ${isOpenNow ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'bg-red-500/20 text-red-400'}`}>
               {isOpenNow ? 'ABIERTO AHORA' : 'CERRADO (Abre 17:00)'}
             </span>

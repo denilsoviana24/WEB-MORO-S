@@ -68,7 +68,7 @@ export default function MenuSection() {
   }, [activeCatIndex]);
 
   return (
-    <section id="menu" className="py-16 bg-[#FFF9F0] relative">
+    <section id="menu" className="py-16 bg-zinc-950 relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <Reveal className="text-center max-w-3xl mx-auto mb-10 space-y-3">
           <p className="text-[11px] font-bold tracking-[0.3em] uppercase text-amber-400">02 — Nuestro menú oficial</p>

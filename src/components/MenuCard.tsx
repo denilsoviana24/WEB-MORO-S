@@ -33,7 +33,7 @@ export default function MenuCard({ item, onOpenModal }: MenuCardProps) {
   return (
     <div
       onClick={() => onOpenModal(item)}
-      className="group relative bg-white border border-[#14532D]/15 hover:border-[#F04E23]/60 rounded-2xl overflow-hidden shadow-[0_8px_25px_rgba(20,83,45,0.08)] hover:shadow-[0_12px_35px_rgba(240,78,35,0.15)] transition-all duration-300 flex flex-col justify-between cursor-pointer"
+      className="group relative bg-zinc-900/90 border border-zinc-800/90 hover:border-orange-500/50 rounded-2xl overflow-hidden shadow-lg hover:shadow-[0_0_25px_rgba(255,85,0,0.15)] transition-all duration-300 flex flex-col justify-between cursor-pointer"
     >
       <div>
         {/* Product Image */}
@@ -76,12 +76,12 @@ export default function MenuCard({ item, onOpenModal }: MenuCardProps) {
         {/* Info Content */}
         <div className="p-4 sm:p-5">
           <div className="flex items-start justify-between gap-2 mb-1.5">
-            <h3 className="font-extrabold text-[#14301F] text-base sm:text-lg group-hover:text-[#F04E23] transition-colors leading-snug">
+            <h3 className="font-extrabold text-white text-base sm:text-lg group-hover:text-orange-400 transition-colors leading-snug">
               {item.name}
             </h3>
           </div>
 
-          <p className="text-[#14301F]/60 text-xs leading-relaxed line-clamp-2 min-h-[32px]">
+          <p className="text-zinc-400 text-xs leading-relaxed line-clamp-2 min-h-[32px]">
             {item.description}
           </p>
         </div>

@@ -34,7 +34,7 @@ export default function PromoBanner() {
   };
 
   return (
-    <section id="promos" className="py-12 bg-[#F5EBD9] border-y border-[#14532D]/15 relative">
+    <section id="promos" className="py-12 bg-zinc-900/60 border-y border-zinc-800/80 relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <Reveal className="flex flex-col md:flex-row items-start md:items-end justify-between mb-8">
           <div>
