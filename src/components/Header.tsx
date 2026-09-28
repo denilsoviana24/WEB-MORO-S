@@ -54,7 +54,7 @@ export default function Header() {
           <div className="relative w-12 h-12 rounded-full overflow-hidden border-2 border-orange-500/80 shadow-[0_0_15px_rgba(255,85,0,0.4)] group-hover:scale-105 transition-transform bg-zinc-900">
             {/* Logo image prepared for replacement as requested by prompt */}
             <Image
-              src="/logo.svg"
+              src="/logo-moros.png"
               alt="Moro's Comidas Rápidas Logo"
               fill
               className="object-cover"

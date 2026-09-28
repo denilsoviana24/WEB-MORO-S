@@ -16,7 +16,7 @@ export default function Footer() {
             <Link href="/" className="flex items-center gap-3">
               <div className="relative w-12 h-12 rounded-full overflow-hidden border-2 border-orange-500 bg-zinc-900">
                 <Image
-                  src="/logo.svg"
+                  src="/logo-moros.png"
                   alt="Moro's Comidas Rápidas Logo"
                   fill
                   className="object-cover"
