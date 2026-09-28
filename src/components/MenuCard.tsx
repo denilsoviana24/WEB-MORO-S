@@ -14,6 +14,7 @@ interface MenuCardProps {
 export default function MenuCard({ item, onOpenModal }: MenuCardProps) {
   const { addToCart, cart } = useCart();
   const [addedAnimation, setAddedAnimation] = React.useState(false);
+  const [imgSrc, setImgSrc] = React.useState(item.image);
 
   // Check how many of this item is currently in cart
   const cartCount = cart
@@ -36,11 +37,14 @@ export default function MenuCard({ item, onOpenModal }: MenuCardProps) {
         {/* Product Image */}
         <div className="relative aspect-[4/3] w-full bg-zinc-950 overflow-hidden">
           <Image
-            src={item.image}
+            src={imgSrc}
             alt={item.name}
             fill
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
             className="object-cover group-hover:scale-105 transition-transform duration-500"
+            onError={() => {
+              if (imgSrc !== '/images/hero.jpg') setImgSrc('/images/hero.jpg');
+            }}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 via-transparent to-transparent opacity-80" />
 
