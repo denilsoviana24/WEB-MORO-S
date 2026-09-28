@@ -52,13 +52,15 @@ export default function Header() {
         {/* Brand Logo */}
         <Link href="/" className="flex items-center gap-3 group">
           <div className="relative w-12 h-12 rounded-full overflow-hidden border-2 border-orange-500/80 shadow-[0_0_15px_rgba(255,85,0,0.4)] group-hover:scale-105 transition-transform bg-zinc-900">
-            {/* Logo image prepared for replacement as requested by prompt */}
-            <Image
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
               src="/logo-moros.png"
               alt="Moro's Comidas Rápidas Logo"
-              fill
-              className="object-cover"
-              priority
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                const t = e.currentTarget;
+                if (!t.src.includes('logo.svg')) t.src = '/logo.svg';
+              }}
             />
           </div>
           <div className="flex flex-col">

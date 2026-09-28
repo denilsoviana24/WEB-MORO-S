@@ -15,11 +15,15 @@ export default function Footer() {
           <div className="space-y-4">
             <Link href="/" className="flex items-center gap-3">
               <div className="relative w-12 h-12 rounded-full overflow-hidden border-2 border-orange-500 bg-zinc-900">
-                <Image
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
                   src="/logo-moros.png"
                   alt="Moro's Comidas Rápidas Logo"
-                  fill
-                  className="object-cover"
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    const t = e.currentTarget;
+                    if (!t.src.includes('logo.svg')) t.src = '/logo.svg';
+                  }}
                 />
               </div>
               <div className="flex flex-col">
