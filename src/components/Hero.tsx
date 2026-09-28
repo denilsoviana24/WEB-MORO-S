@@ -11,9 +11,6 @@ const LEFT_DISH = MENU_ITEMS.find((m) => m.id === 'broaster-1')?.image || '/imag
 const CENTER_DISH = '/images/hero.jpg';
 const RIGHT_DISH = MENU_ITEMS.find((m) => m.id === 'mixto-bbq')?.image || '/images/hero.jpg';
 
-// Imagen de hamburguesa realista (Unsplash - hamburguesa gourmet apetitosa)
-const BURGER_IMAGE = 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=1000&q=80';
-
 function Steam() {
   return (
     <div className="pointer-events-none absolute -top-10 left-1/2 -translate-x-1/2 flex gap-2">
@@ -26,71 +23,6 @@ function Steam() {
         />
       ))}
     </div>
-  );
-}
-
-function HeroBurger() {
-  return (
-    <motion.div
-      className="pointer-events-none fixed right-6 top-1/2 -translate-y-1/2 z-[5] hidden lg:block"
-      initial={{ opacity: 0, x: 120, rotateY: -25, scale: 0.9 }}
-      animate={{ opacity: 1, x: 0, rotateY: 0, scale: 1 }}
-      transition={{ duration: 1.4, delay: 1, ease: [0.22, 1, 0.36, 1] }}
-    >
-      <div className="relative w-64 h-64 sm:w-80 sm:h-80" style={{ transformStyle: 'preserve-3d' }}>
-        {/* Sombra proyectada realista en el suelo */}
-        <div className="absolute bottom-[-20px] left-1/2 -translate-x-1/2 w-40 h-10 bg-black/25 rounded-full blur-3xl" style={{ transform: 'translateZ(-40px)' }} />
-        
-        {/* Resplandor ambiental cálido detrás */}
-        <div className="absolute inset-0 rounded-[50%] bg-gradient-to-tr from-amber-400/15 via-transparent to-transparent blur-3xl" style={{ transform: 'translateZ(-30px)' }} />
-
-        {/* Hamburguesa real con humo */}
-        <div className="relative w-full h-full" style={{ transformStyle: 'preserve-3d' }}>
-          {/* Humo sutil saliendo - 5 columnas finas */}
-          <div className="pointer-events-none absolute top-[-30px] left-1/2 -translate-x-1/2 flex gap-1.5" style={{ transform: 'translateZ(50px)' }}>
-            {[0, 1, 2, 3, 4].map((i) => (
-              <motion.span
-                key={i}
-                animate={{ 
-                  y: [0, -100], 
-                  opacity: [0, 0.12, 0], 
-                  scale: [0.5, 1.1],
-                  x: [(i - 2) * 6, (i - 2) * 14]
-                }}
-                transition={{ duration: 5, repeat: Infinity, delay: i * 1.1, ease: 'easeOut' }}
-                className="block h-14 w-6 rounded-full bg-white/10 blur-xl"
-              />
-            ))}
-          </div>
-
-          {/* Imagen de la hamburguesa real */}
-          <div className="relative w-full h-full" style={{ transform: 'perspective(1000px) rotateY(-8deg) rotateX(3deg)' }}>
-            <div className="absolute inset-0 rounded-[50%] overflow-hidden shadow-[0_30px_80px_rgba(0,0,0,0.5),_0_0_60px_rgba(255,140,0,0.25)] ring-1 ring-amber-300/20">
-              <Image
-                src={BURGER_IMAGE}
-                alt="Hamburguesa Moro's recién hecha"
-                fill
-                className="object-cover object-center"
-                priority
-              />
-              {/* Brillo superior sutil */}
-              <div className="absolute inset-0 bg-gradient-to-b from-white/10 via-transparent to-transparent pointer-events-none" />
-              {/* Oscurecimiento bordes para profundidad */}
-              <div className="absolute inset-0 bg-gradient-to-r from-black/20 via-transparent to-black/20 pointer-events-none" />
-            </div>
-            
-            {/* Etiqueta flotante "RECIÉN HECHA" */}
-            <motion.div
-              animate={{ y: [0, -6, 0] }}
-              transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-              className="absolute -bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap bg-zinc-950/95 backdrop-blur-sm border border-amber-400/40 text-amber-300 text-[10px] font-black tracking-widest px-4 py-2 rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.4)]"
-            >
-              🔥 RECIÉN HECHA
-            </motion.div>
-          </div>
-        </div>
-      </div>
-    </motion.div>
   );
 }
 
@@ -175,9 +107,6 @@ export default function Hero() {
             Desliza para descubrir el sabor
           </p>
         </motion.div>
-
-        {/* Hamburguesa decorativa lateral */}
-        <HeroBurger />
 
         {/* 3 platos flotantes */}
         <div className="mt-6 relative h-72 sm:h-96" style={{ transformStyle: 'preserve-3d' }}>
