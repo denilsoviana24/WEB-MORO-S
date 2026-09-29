@@ -57,6 +57,7 @@ export default function Intro() {
       } catch {
         // ignorar
       }
+      window.dispatchEvent(new Event('moros:intro-done'));
     }, 700);
     return () => clearTimeout(t);
   }, [show, eatenCount]);
@@ -69,6 +70,7 @@ export default function Intro() {
     } catch {
       // ignorar
     }
+    window.dispatchEvent(new Event('moros:intro-done'));
   };
 
   return (
