@@ -103,3 +103,52 @@ export async function submitContactMessage(contactData: {
     return { success: true, message: '¡Mensaje enviado con éxito!' };
   }
 }
+
+// ---- Reseñas / Calificaciones ----
+export type Review = {
+  id?: string;
+  nombre: string;
+  atencion: number;
+  producto: number;
+  servicio: number;
+  entrega: number;
+  comentario?: string;
+  created_at?: string;
+};
+
+export async function getReviews(): Promise<Review[]> {
+  if (!supabase) return [];
+  try {
+    const { data, error } = await supabase
+      .from('resenas')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(50);
+    if (error || !data) return [];
+    return data as Review[];
+  } catch {
+    return [];
+  }
+}
+
+export async function submitReview(
+  review: Omit<Review, 'id' | 'created_at'>
+): Promise<boolean> {
+  if (!supabase) return false;
+  try {
+    const { error } = await supabase.from('resenas').insert([
+      {
+        nombre: review.nombre,
+        atencion: review.atencion,
+        producto: review.producto,
+        servicio: review.servicio,
+        entrega: review.entrega,
+        comentario: review.comentario || '',
+        created_at: new Date().toISOString(),
+      },
+    ]);
+    return !error;
+  } catch {
+    return false;
+  }
+}

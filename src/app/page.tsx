@@ -5,6 +5,7 @@ import MenuSection from '@/components/MenuSection';
 import AnatomySection from '@/components/AnatomySection';
 import StoryTimeline from '@/components/StoryTimeline';
 import AboutSection from '@/components/AboutSection';
+import ReviewsSection from '@/components/ReviewsSection';
 import LocationContact from '@/components/LocationContact';
 
 export default function Home() {
@@ -24,6 +25,7 @@ export default function Home() {
       <AnatomySection />
       <StoryTimeline />
       <AboutSection />
+      <ReviewsSection />
       <LocationContact />
     </>
   );
