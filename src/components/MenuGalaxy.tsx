@@ -36,15 +36,17 @@ export default function MenuGalaxy({ openId, onSelect, onOpenItem }: Props) {
   // Estrellas de fondo (deterministas)
   const bgStars = useMemo(
     () =>
-      Array.from({ length: 90 }, (_, i) => {
+      Array.from({ length: 150 }, (_, i) => {
         const a = ((i * 137.508) % 360) * (Math.PI / 180);
-        const r = 4 + ((i * 29) % 46);
+        const r = 3 + ((i * 29) % 47);
+        const big = i % 11 === 0;
         return {
           left: `${50 + r * Math.cos(a)}%`,
           top: `${50 + r * Math.sin(a)}%`,
-          size: 1 + ((i * 7) % 3),
+          size: big ? 3 + ((i * 7) % 3) : 1 + ((i * 7) % 2),
           dur: 1.6 + ((i * 13) % 30) / 10,
           delay: ((i * 17) % 40) / 10,
+          glow: big,
         };
       }),
     []
@@ -68,32 +70,61 @@ export default function MenuGalaxy({ openId, onSelect, onOpenItem }: Props) {
       onMouseEnter={reveal}
       onTouchStart={reveal}
       onClick={reveal}
-      className="relative mx-auto mb-8 h-[440px] sm:h-[560px] max-w-4xl overflow-hidden rounded-3xl border border-zinc-800 bg-[#050406] cursor-pointer"
+      className="relative mx-auto mb-8 h-[520px] sm:h-[660px] lg:h-[760px] w-full max-w-5xl overflow-hidden rounded-[2rem] border border-zinc-800 bg-[#020103] cursor-pointer"
     >
-      {/* Nebulosa giratoria */}
+      {/* Halo central de la galaxia */}
       <div
-        className="absolute inset-[6%] rounded-full blur-3xl opacity-70 animate-spin pointer-events-none"
+        className="absolute inset-0 pointer-events-none"
         style={{
           background:
-            'conic-gradient(from 0deg, transparent, rgba(255,120,0,0.28), transparent 35%, rgba(255,200,30,0.16), transparent 65%, rgba(255,80,0,0.22), transparent)',
-          animationDuration: '50s',
+            'radial-gradient(ellipse 55% 50% at 50% 50%, rgba(255,170,60,0.28), rgba(255,100,20,0.12) 45%, transparent 75%)',
         }}
       />
+
+      {/* Disco galáctico inclinado */}
       <div
-        className="absolute inset-[22%] rounded-full blur-2xl opacity-60 animate-spin pointer-events-none"
+        className="absolute left-1/2 top-1/2 w-[135%] h-[52%] rounded-[50%] blur-2xl opacity-70 pointer-events-none"
         style={{
+          transform: 'translate(-50%, -50%) rotate(-14deg)',
           background:
-            'conic-gradient(from 180deg, transparent, rgba(255,170,40,0.3), transparent 45%, rgba(255,60,60,0.15), transparent)',
-          animationDuration: '75s',
-          animationDirection: 'reverse',
+            'radial-gradient(ellipse at center, rgba(255,200,90,0.35), rgba(255,110,20,0.18) 40%, transparent 70%)',
         }}
       />
+
+      {/* Brazos espirales girando */}
+      <div className="absolute inset-0 animate-spin pointer-events-none" style={{ animationDuration: '90s' }}>
+        {[0, 1, 2].map((i) => (
+          <div
+            key={i}
+            className="absolute left-1/2 top-1/2 w-[150%] h-[46%] rounded-[50%] blur-3xl"
+            style={{
+              transform: `translate(-50%, -50%) rotate(${i * 60 + 15}deg)`,
+              background: `radial-gradient(ellipse at 28% 50%, rgba(255,150,40,${i === 0 ? 0.4 : 0.26}), transparent 55%), radial-gradient(ellipse at 74% 50%, rgba(255,80,20,${i === 1 ? 0.36 : 0.22}), transparent 55%)`,
+            }}
+          />
+        ))}
+      </div>
+      <div className="absolute inset-0 animate-spin pointer-events-none" style={{ animationDuration: '140s', animationDirection: 'reverse' }}>
+        {[0, 1].map((i) => (
+          <div
+            key={i}
+            className="absolute left-1/2 top-1/2 w-[125%] h-[36%] rounded-[50%] blur-3xl opacity-80"
+            style={{
+              transform: `translate(-50%, -50%) rotate(${i * 90 + 55}deg)`,
+              background:
+                'radial-gradient(ellipse at 50% 50%, rgba(255,220,120,0.3), transparent 60%)',
+            }}
+          />
+        ))}
+      </div>
 
       {/* Estrellas de fondo */}
       {bgStars.map((s, i) => (
         <span
           key={i}
-          className="absolute rounded-full bg-white animate-pulse pointer-events-none"
+          className={`absolute rounded-full bg-white animate-pulse pointer-events-none ${
+            s.glow ? 'shadow-[0_0_10px_2px_rgba(255,220,150,0.8)]' : ''
+          }`}
           style={{
             left: s.left,
             top: s.top,
@@ -136,12 +167,16 @@ export default function MenuGalaxy({ openId, onSelect, onOpenItem }: Props) {
 
       {/* Núcleo central */}
       <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
+        <div
+          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-56 h-56 sm:w-72 sm:h-72 rounded-full blur-2xl"
+          style={{ background: 'radial-gradient(circle, rgba(255,190,80,0.55), transparent 65%)' }}
+        />
         <motion.div
-          animate={{ scale: [1, 1.1, 1] }}
+          animate={{ scale: [1, 1.08, 1] }}
           transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut' }}
-          className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-amber-300 via-orange-500 to-orange-700 shadow-[0_0_70px_rgba(255,140,0,0.65)] flex items-center justify-center"
+          className="relative w-24 h-24 sm:w-32 sm:h-32 rounded-full bg-gradient-to-br from-amber-200 via-orange-400 to-orange-700 shadow-[0_0_100px_30px_rgba(255,150,40,0.55)] flex items-center justify-center"
         >
-          <span className="text-xl sm:text-2xl font-black text-zinc-950 tracking-tighter">M</span>
+          <span className="text-2xl sm:text-4xl font-black text-zinc-950 tracking-tighter">M</span>
         </motion.div>
       </div>
 
