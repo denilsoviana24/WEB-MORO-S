@@ -1,18 +1,18 @@
 'use client';
 
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CATEGORIES, MENU_ITEMS, MenuItem } from '@/data/menuData';
 import MenuCard from './MenuCard';
+import MenuGalaxy from './MenuGalaxy';
 import ProductModal from './ProductModal';
 import Reveal from './Reveal';
-import { Search, Utensils, ChevronDown, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
+import { Search, Utensils, Sparkles } from 'lucide-react';
 
 export default function MenuSection() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeModalItem, setActiveModalItem] = useState<MenuItem | null>(null);
   const [openCategory, setOpenCategory] = useState<string | null>(null);
-  const rowRef = useRef<HTMLDivElement>(null);
 
   const searchFiltered = useMemo(() => {
     if (!searchQuery.trim()) return null;
@@ -33,10 +33,6 @@ export default function MenuSection() {
       .filter((g) => g.items.length > 0);
   }, []);
 
-  const toggleCategory = (catId: string) => {
-    setOpenCategory((prev) => (prev === catId ? null : catId));
-  };
-
   return (
     <section id="menu" className="py-16 bg-zinc-950 relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -45,13 +41,13 @@ export default function MenuSection() {
           <p className="text-[11px] font-bold tracking-[0.3em] uppercase text-amber-400">02 — Nuestro menú oficial</p>
           <div className="inline-flex items-center gap-2 bg-gradient-to-r from-orange-500/20 to-amber-500/20 border border-orange-500/30 px-4 py-1 rounded-full text-xs font-black text-amber-400">
             <Utensils className="w-4 h-4 text-orange-500" />
-            <span>CATEGORÍAS DESPLEGABLES</span>
+            <span>GALAXIA DE SABORES</span>
           </div>
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight">
             Sabor Exquisito en <span className="bg-gradient-to-r from-orange-500 to-amber-400 bg-clip-text text-transparent">Cada Bocado</span>
           </h2>
           <p className="text-zinc-400 text-sm sm:text-base leading-relaxed">
-            Toca una categoría para desplegar sus platos con animación. Selecciona tus favoritos y ordénalos por WhatsApp.
+            Pasa el mouse por la galaxia: cada categoría es una estrella y sus platos salen como una constelación. Toca una para desplegarla.
           </p>
         </Reveal>
 
@@ -106,41 +102,22 @@ export default function MenuSection() {
           )
         ) : (
           <>
-            {/* Horizontal Category Tabs - Accordion Triggers */}
-            <div className="flex items-center gap-2.5 overflow-x-auto pb-4 mb-6 scrollbar-none snap-x">
-              {grouped.map((g, i) => (
-                <button
-                  key={g.cat.id}
-                  onClick={() => toggleCategory(g.cat.id)}
-                  className={`snap-start shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all border relative ${
-                    openCategory === g.cat.id
-                      ? 'bg-gradient-to-r from-orange-600 to-amber-500 text-zinc-950 border-amber-400 shadow-[0_0_15px_rgba(255,85,0,0.3)] scale-105'
-                      : 'bg-zinc-900 border-zinc-800 text-zinc-300 hover:border-zinc-700 hover:text-white'
-                  }`}
-                >
-                  <span className="text-sm">{g.cat.icon}</span>
-                  <span>{g.cat.name}</span>
-                  <span
-                    className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
-                      openCategory === g.cat.id ? 'bg-zinc-950 text-amber-400' : 'bg-zinc-800 text-zinc-400'
-                    }`}
-                  >
-                    {g.items.length}
-                  </span>
-                  {/* Chevron indicator */}
-                  <motion.div
-                    animate={{ rotate: openCategory === g.cat.id ? 180 : 0 }}
-                    transition={{ duration: 0.3, ease: 'easeInOut' }}
-                    className="w-4 h-4 text-amber-400"
-                  >
-                    <ChevronDown className="w-4 h-4" />
-                  </motion.div>
-                </button>
-              ))}
-            </div>
+            {/* Galaxia de categorías */}
+            <MenuGalaxy
+              openId={openCategory}
+              onSelect={(id) => {
+                setOpenCategory((prev) => (prev === id ? null : id));
+                setTimeout(() => {
+                  document
+                    .getElementById('menu-detail')
+                    ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 150);
+              }}
+              onOpenItem={(it) => setActiveModalItem(it)}
+            />
 
             {/* Accordion Content Panels */}
-            <div className="space-y-4">
+            <div id="menu-detail" className="space-y-4 scroll-mt-24">
               {grouped.map((g) => {
                 const isOpen = openCategory === g.cat.id;
                 return (
@@ -216,7 +193,7 @@ export default function MenuSection() {
                   <Sparkles className="w-12 h-12 text-zinc-600 mx-auto" />
                   <h3 className="text-xl font-bold text-white">Elige una categoría</h3>
                   <p className="text-zinc-400 text-xs max-w-sm mx-auto">
-                    Toca cualquier categoría arriba para ver sus platos con animación.
+                    Toca una estrella de la galaxia para ver sus platos con animación.
                   </p>
                 </motion.div>
               )}
