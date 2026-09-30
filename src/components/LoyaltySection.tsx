@@ -16,16 +16,50 @@ import {
 export default function LoyaltySection() {
   const [stamps, setStamps] = useState(0);
   const [copied, setCopied] = useState<string | null>(null);
+  const [owner, setOwner] = useState(false);
+  const [taps, setTaps] = useState(0);
 
   // Carga inicial + se actualiza solo cuando el carrito suma un sello
   useEffect(() => {
     setStamps(getLoyaltyStamps(STAMPS_GOAL));
+    try {
+      if (sessionStorage.getItem('moros-owner') === '1') setOwner(true);
+    } catch {
+      // ignorar
+    }
     const refresh = () => setStamps(getLoyaltyStamps(STAMPS_GOAL));
     window.addEventListener(LOYALTY_EVENT, refresh);
     return () => window.removeEventListener(LOYALTY_EVENT, refresh);
   }, []);
 
   const unlocked = stamps >= STAMPS_GOAL;
+
+  // 5 toques en el título = modo dueño (solo personal del local)
+  const handleTitleTap = () => {
+    if (owner) return;
+    const next = taps + 1;
+    setTaps(next);
+    if (next >= 5) {
+      setOwner(true);
+      setTaps(0);
+      try {
+        sessionStorage.setItem('moros-owner', '1');
+      } catch {
+        // ignorar
+      }
+    } else {
+      window.setTimeout(() => setTaps(0), 2500);
+    }
+  };
+
+  const exitOwner = () => {
+    setOwner(false);
+    try {
+      sessionStorage.removeItem('moros-owner');
+    } catch {
+      // ignorar
+    }
+  };
 
   const addStamp = () => {
     const { stamps: next, completed } = addLoyaltyStamp(STAMPS_GOAL);
@@ -78,14 +112,28 @@ export default function LoyaltySection() {
           <Reveal className="h-full">
             <div className="h-full rounded-3xl border border-amber-500/30 bg-gradient-to-br from-zinc-900 via-zinc-950 to-zinc-900 p-6 sm:p-8 flex flex-col">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
+                <button
+                  onClick={handleTitleTap}
+                  className="flex items-center gap-2 select-none"
+                  title="Mi Tarjeta Fiel"
+                >
                   <Stamp className="w-5 h-5 text-amber-400" />
                   <h3 className="font-black text-white text-lg">Mi Tarjeta Fiel</h3>
-                </div>
+                </button>
                 <span className="text-xs font-bold text-zinc-400">
                   {stamps}/{STAMPS_GOAL} sellos
                 </span>
               </div>
+              {owner && (
+                <div className="mt-2 flex justify-end">
+                  <button
+                    onClick={exitOwner}
+                    className="text-[10px] font-black uppercase tracking-wider text-amber-400 bg-amber-500/10 border border-amber-500/40 px-2.5 py-1 rounded-full"
+                  >
+                    👑 Modo dueño · salir
+                  </button>
+                </div>
+              )}
 
               {/* progreso */}
               <div className="mt-3 h-2.5 rounded-full bg-zinc-800 overflow-hidden">
@@ -115,29 +163,21 @@ export default function LoyaltySection() {
               </div>
 
               <p className="mt-4 text-xs text-zinc-400 leading-relaxed">
-                Cada pedido en la web suma 1 sello automáticamente 🍟. En el local, pide al personal que selle tu tarjeta. Al completar los {STAMPS_GOAL} sellos reclamas tu premio.
+                Muestra tu tarjeta en el local para sellar tu visita. Cada pedido en la web suma 1 sello automáticamente 🍟. Al completar los {STAMPS_GOAL} sellos reclamas tu premio.
               </p>
 
-              <div className="mt-auto pt-5 flex flex-col sm:flex-row gap-3">
-                <button
-                  onClick={addStamp}
-                  disabled={stamps >= STAMPS_GOAL}
-                  className="flex-1 bg-gradient-to-r from-orange-600 via-amber-500 to-orange-500 text-zinc-950 font-black text-sm px-5 py-3 rounded-2xl hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none"
-                >
-                  {stamps >= STAMPS_GOAL ? '¡Tarjeta completa! 🎉' : 'Sumar sello de mi visita'}
-                </button>
-                {stamps > 0 && !unlocked && (
+              {/* Botón de sellar: SOLO visible en modo dueño */}
+              {owner && (
+                <div className="mt-auto pt-5">
                   <button
-                    onClick={() => {
-                      resetLoyaltyStamps();
-                      setStamps(0);
-                    }}
-                    className="text-xs font-bold text-zinc-500 hover:text-zinc-300 px-3 py-2"
+                    onClick={addStamp}
+                    disabled={unlocked}
+                    className="w-full bg-gradient-to-r from-orange-600 via-amber-500 to-orange-500 text-zinc-950 font-black text-sm px-5 py-3 rounded-2xl hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none"
                   >
-                    Reiniciar
+                    {unlocked ? '¡Tarjeta completa! 🎉' : 'Sumar sello de la visita 👑'}
                   </button>
-                )}
-              </div>
+                </div>
+              )}
 
               {/* premio desbloqueado */}
               <AnimatePresence>
@@ -166,12 +206,18 @@ export default function LoyaltySection() {
                         {copied === STAMPS_REWARD.code ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
                       </button>
                     </div>
-                    <button
-                      onClick={claimReward}
-                      className="mt-3 w-full text-xs font-bold text-emerald-400 hover:text-emerald-300"
-                    >
-                      Ya reclamé mi premio → empezar nueva tarjeta
-                    </button>
+                    {owner ? (
+                      <button
+                        onClick={claimReward}
+                        className="mt-3 w-full text-xs font-bold text-emerald-400 hover:text-emerald-300"
+                      >
+                        Ya entregué el premio → empezar nueva tarjeta
+                      </button>
+                    ) : (
+                      <p className="mt-3 text-center text-xs text-zinc-400">
+                        Muestra este código en caja para recibir tu premio.
+                      </p>
+                    )}
                   </motion.div>
                 )}
               </AnimatePresence>
