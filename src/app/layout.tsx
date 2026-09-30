@@ -34,6 +34,10 @@ export const metadata: Metadata = {
     description: "Menú oficial de Moro's: Broaster, Hamburguesas, Papi Completas y BBQ.",
     images: ['/images/hero.jpg'],
   },
+  icons: {
+    icon: '/logo-moros.jpg',
+    apple: '/logo-moros.jpg',
+  },
 };
 
 export default function RootLayout({
