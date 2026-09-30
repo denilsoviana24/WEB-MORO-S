@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import type { CartItem } from '@/context/CartContext';
 import { RESTAURANT_INFO } from '@/data/menuData';
+import { createOrderNumber, type OrderData } from '@/components/OrderTicket';
 import {
   PAYMENT_METHODS,
   BANK_ACCOUNT,
@@ -29,6 +30,7 @@ interface CheckoutPaymentProps {
   deliveryAddress: string;
   orderNotes: string;
   onBack: () => void;
+  onOrderComplete: (order: OrderData) => void;
 }
 
 const METHOD_LABEL: Record<PaymentMethodId, string> = {
@@ -46,6 +48,7 @@ export default function CheckoutPayment({
   deliveryAddress,
   orderNotes,
   onBack,
+  onOrderComplete,
 }: CheckoutPaymentProps) {
   const [method, setMethod] = useState<PaymentMethodId>('cash');
   const [paying, setPaying] = useState(false);
@@ -82,6 +85,29 @@ export default function CheckoutPayment({
       `https://wa.me/${RESTAURANT_INFO.whatsappFormatted}?text=${encodeURIComponent(message)}`,
       '_blank'
     );
+  };
+
+  // Arma el pedido, lo envía por WhatsApp y genera el comprobante
+  const completeOrder = (extra?: string) => {
+    const order: OrderData = {
+      number: createOrderNumber(),
+      timestamp: Date.now(),
+      customerName,
+      customerPhone,
+      deliveryType,
+      deliveryAddress,
+      paymentMethod: METHOD_LABEL[method],
+      items: cart.map((item) => ({
+        name: item.product.name,
+        detail: item.selectedOption?.size || item.notes,
+        qty: item.quantity,
+        price: item.selectedOption ? item.selectedOption.price : item.product.price,
+      })),
+      notes: orderNotes,
+      total: Number(subtotal.toFixed(2)),
+    };
+    openWhatsApp(buildMessage(extra));
+    onOrderComplete(order);
   };
 
   const copyField = async (key: string, value: string) => {
@@ -233,7 +259,7 @@ export default function CheckoutPayment({
       {method === 'cash' && (
         <button
           type="button"
-          onClick={() => openWhatsApp(buildMessage())}
+          onClick={() => completeOrder()}
           className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3.5 px-4 rounded-2xl flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:scale-[1.02] active:scale-95 transition-all text-sm"
         >
           <Send className="w-4 h-4" />
@@ -244,7 +270,7 @@ export default function CheckoutPayment({
       {method === 'transfer' && (
         <button
           type="button"
-          onClick={() => openWhatsApp(buildMessage('🧾 Ya realicé la transferencia, envío el comprobante.'))}
+          onClick={() => completeOrder('🧾 Ya realicé la transferencia, envío el comprobante.')}
           className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3.5 px-4 rounded-2xl flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:scale-[1.02] active:scale-95 transition-all text-sm"
         >
           <Send className="w-4 h-4" />

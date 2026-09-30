@@ -100,3 +100,26 @@ body {
     cursor: auto !important;
   }
 }
+
+/* ——— Impresión del comprobante: solo sale el ticket ——— */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #order-ticket,
+  #order-ticket * {
+    visibility: visible;
+  }
+  #order-ticket {
+    position: absolute !important;
+    top: 0;
+    left: 0;
+    right: 0;
+    margin: 0 auto;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+  .ticket-actions {
+    display: none !important;
+  }
+}

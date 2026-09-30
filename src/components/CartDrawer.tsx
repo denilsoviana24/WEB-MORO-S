@@ -6,6 +6,7 @@ import { X, Plus, Minus, Trash2, ShoppingBag, ArrowRight, MapPin, Store, User, P
 import { useCart } from '@/context/CartContext';
 import { RESTAURANT_INFO } from '@/data/menuData';
 import CheckoutPayment from '@/components/CheckoutPayment';
+import OrderTicket, { type OrderData } from '@/components/OrderTicket';
 
 export default function CartDrawer() {
   const { cart, isCartOpen, setIsCartOpen, removeFromCart, updateQuantity, clearCart, subtotal, totalItems } = useCart();
@@ -15,11 +16,23 @@ export default function CartDrawer() {
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [orderNotes, setOrderNotes] = useState('');
   const [step, setStep] = useState<'cart' | 'pay'>('cart');
+  const [ticket, setTicket] = useState<OrderData | null>(null);
 
   // Al abrir el carrito, siempre empezar en el paso del pedido
   useEffect(() => {
     if (isCartOpen) setStep('cart');
   }, [isCartOpen]);
+
+  // Pedido completado: mostrar comprobante, vaciar carrito y cerrar drawer
+  const handleOrderComplete = (order: OrderData) => {
+    setTicket(order);
+    clearCart();
+    setIsCartOpen(false);
+  };
+
+  if (ticket) {
+    return <OrderTicket order={ticket} onClose={() => setTicket(null)} />;
+  }
 
   if (!isCartOpen) return null;
 
@@ -85,6 +98,7 @@ export default function CartDrawer() {
                 deliveryAddress={deliveryAddress}
                 orderNotes={orderNotes}
                 onBack={() => setStep('cart')}
+                onOrderComplete={handleOrderComplete}
               />
             ) : cart.length === 0 ? (
               <div className="text-center py-16 space-y-4">
