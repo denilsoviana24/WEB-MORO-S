@@ -7,6 +7,9 @@ import { useCart } from '@/context/CartContext';
 import { RESTAURANT_INFO } from '@/data/menuData';
 import CheckoutPayment from '@/components/CheckoutPayment';
 import OrderTicket, { type OrderData } from '@/components/OrderTicket';
+import { addLoyaltyStamp } from '@/lib/loyalty';
+import { STAMPS_GOAL } from '@/data/loyaltyData';
+import { friesRain } from '@/lib/friesRain';
 
 export default function CartDrawer() {
   const { cart, isCartOpen, setIsCartOpen, removeFromCart, updateQuantity, clearCart, subtotal, totalItems } = useCart();
@@ -23,8 +26,10 @@ export default function CartDrawer() {
     if (isCartOpen) setStep('cart');
   }, [isCartOpen]);
 
-  // Pedido completado: mostrar comprobante, vaciar carrito y cerrar drawer
+  // Pedido completado: suma 1 sello fiel, muestra comprobante, vacía carrito y cierra
   const handleOrderComplete = (order: OrderData) => {
+    const { completed } = addLoyaltyStamp(STAMPS_GOAL);
+    if (completed) friesRain();
     setTicket(order);
     clearCart();
     setIsCartOpen(false);

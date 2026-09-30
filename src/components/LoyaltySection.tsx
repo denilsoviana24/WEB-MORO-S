@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Crown, Copy, Check, Gift, Stamp, Ticket } from 'lucide-react';
 import Reveal from './Reveal';
 import { friesRain } from '@/lib/friesRain';
+import { getLoyaltyStamps, addLoyaltyStamp, resetLoyaltyStamps, LOYALTY_EVENT } from '@/lib/loyalty';
 import {
   LOYALTY_TIERS,
   LOYALTY_PROMOS,
@@ -12,44 +13,29 @@ import {
   STAMPS_REWARD,
 } from '@/data/loyaltyData';
 
-const STORAGE_KEY = 'moros_loyalty_stamps';
-
 export default function LoyaltySection() {
   const [stamps, setStamps] = useState(0);
   const [copied, setCopied] = useState<string | null>(null);
-  const [rewardReady, setRewardReady] = useState(false);
 
+  // Carga inicial + se actualiza solo cuando el carrito suma un sello
   useEffect(() => {
-    try {
-      const saved = parseInt(localStorage.getItem(STORAGE_KEY) || '0', 10);
-      if (!isNaN(saved)) setStamps(Math.min(saved, STAMPS_GOAL));
-    } catch {
-      // ignorar
-    }
+    setStamps(getLoyaltyStamps(STAMPS_GOAL));
+    const refresh = () => setStamps(getLoyaltyStamps(STAMPS_GOAL));
+    window.addEventListener(LOYALTY_EVENT, refresh);
+    return () => window.removeEventListener(LOYALTY_EVENT, refresh);
   }, []);
 
-  const persist = (value: number) => {
-    setStamps(value);
-    try {
-      localStorage.setItem(STORAGE_KEY, String(value));
-    } catch {
-      // ignorar
-    }
-  };
+  const unlocked = stamps >= STAMPS_GOAL;
 
   const addStamp = () => {
-    if (stamps >= STAMPS_GOAL) return;
-    const next = stamps + 1;
-    persist(next);
-    if (next === STAMPS_GOAL) {
-      setRewardReady(true);
-      friesRain();
-    }
+    const { stamps: next, completed } = addLoyaltyStamp(STAMPS_GOAL);
+    setStamps(next);
+    if (completed) friesRain();
   };
 
   const claimReward = () => {
-    setRewardReady(false);
-    persist(0);
+    resetLoyaltyStamps();
+    setStamps(0);
   };
 
   const copyCode = async (code: string) => {
@@ -111,7 +97,7 @@ export default function LoyaltySection() {
               </div>
 
               {/* sellos */}
-              <div className="mt-5 grid grid-cols-4 gap-3">
+              <div className="mt-5 grid grid-cols-5 gap-2 sm:gap-3">
                 {Array.from({ length: STAMPS_GOAL }).map((_, i) => (
                   <motion.div
                     key={i}
@@ -129,7 +115,7 @@ export default function LoyaltySection() {
               </div>
 
               <p className="mt-4 text-xs text-zinc-400 leading-relaxed">
-                Pide al personal que selle tu tarjeta en cada visita. Al completar los {STAMPS_GOAL} sellos reclamas tu premio en el local.
+                Cada pedido en la web suma 1 sello automáticamente 🍟. En el local, pide al personal que selle tu tarjeta. Al completar los {STAMPS_GOAL} sellos reclamas tu premio.
               </p>
 
               <div className="mt-auto pt-5 flex flex-col sm:flex-row gap-3">
@@ -140,9 +126,12 @@ export default function LoyaltySection() {
                 >
                   {stamps >= STAMPS_GOAL ? '¡Tarjeta completa! 🎉' : 'Sumar sello de mi visita'}
                 </button>
-                {stamps > 0 && stamps < STAMPS_GOAL && (
+                {stamps > 0 && !unlocked && (
                   <button
-                    onClick={() => persist(0)}
+                    onClick={() => {
+                      resetLoyaltyStamps();
+                      setStamps(0);
+                    }}
                     className="text-xs font-bold text-zinc-500 hover:text-zinc-300 px-3 py-2"
                   >
                     Reiniciar
@@ -152,7 +141,7 @@ export default function LoyaltySection() {
 
               {/* premio desbloqueado */}
               <AnimatePresence>
-                {rewardReady && (
+                {unlocked && (
                   <motion.div
                     initial={{ opacity: 0, y: 16, scale: 0.97 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}

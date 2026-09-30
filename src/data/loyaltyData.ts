@@ -16,13 +16,13 @@ export interface LoyaltyPromo {
   badge: string;
 }
 
-export const STAMPS_GOAL = 8;
+export const STAMPS_GOAL = 20;
 
 export const STAMPS_REWARD = {
   title: 'Papi Completa Moro’s GRATIS',
   description:
-    'Completa los 8 sellos de tu tarjeta fiel y reclama una Papi Completa Moro’s totalmente gratis en el local.',
-  code: 'MOROS-FIEL-8',
+    'Completa todos los sellos de tu tarjeta fiel y reclama una Papi Completa Moro’s totalmente gratis en el local.',
+  code: 'MOROS-FIEL-20',
 };
 
 export const LOYALTY_TIERS: LoyaltyTier[] = [
@@ -30,7 +30,7 @@ export const LOYALTY_TIERS: LoyaltyTier[] = [
     id: 'bronce',
     name: 'Moro Bronce',
     icon: '🥉',
-    visits: '1 - 4 visitas',
+    visits: '1 - 6 visitas',
     color: 'from-amber-700 via-amber-600 to-yellow-700',
     border: 'border-amber-700/50',
     benefits: [
@@ -43,7 +43,7 @@ export const LOYALTY_TIERS: LoyaltyTier[] = [
     id: 'plata',
     name: 'Moro Plata',
     icon: '🥈',
-    visits: '5 - 11 visitas',
+    visits: '7 - 14 visitas',
     color: 'from-zinc-400 via-zinc-300 to-zinc-500',
     border: 'border-zinc-400/50',
     benefits: [
@@ -56,7 +56,7 @@ export const LOYALTY_TIERS: LoyaltyTier[] = [
     id: 'oro',
     name: 'Moro Oro',
     icon: '🥇',
-    visits: '12+ visitas',
+    visits: '15+ visitas',
     color: 'from-yellow-500 via-amber-400 to-orange-500',
     border: 'border-amber-400/60',
     benefits: [
