@@ -3,7 +3,6 @@ import Marquee from '@/components/Marquee';
 import ExperienceSection from '@/components/ExperienceSection';
 import MenuSection from '@/components/MenuSection';
 import AnatomySection from '@/components/AnatomySection';
-import StoryTimeline from '@/components/StoryTimeline';
 import AboutSection from '@/components/AboutSection';
 import ReviewsSection from '@/components/ReviewsSection';
 import LoyaltySection from '@/components/LoyaltySection';
@@ -24,7 +23,6 @@ export default function Home() {
         items={['Pollo Broaster', 'Hamburguesa Moro’s', 'Papi Completa', 'Costillas BBQ']}
       />
       <AnatomySection />
-      <StoryTimeline />
       <AboutSection />
       <ReviewsSection />
       <LoyaltySection />
