@@ -85,6 +85,9 @@ export default function Header() {
           <Link href="/#promos" className="hover:text-orange-400 transition-colors flex items-center gap-1 text-amber-400">
             <span>🔥</span> Promociones
           </Link>
+          <Link href="/promociones#club-moros" className="hover:text-orange-400 transition-colors flex items-center gap-1">
+            <span>⭐</span> Club Moro&apos;s
+          </Link>
           <Link href="/#nosotros" className="hover:text-orange-400 transition-colors">
             Nosotros
           </Link>
@@ -164,6 +167,13 @@ export default function Header() {
             >
               <span>Promociones Especiales</span>
               <span className="text-xs bg-amber-500/20 px-2 py-0.5 rounded-full text-amber-300">🔥 Descuentos</span>
+            </Link>
+            <Link
+              href="/promociones#club-moros"
+              onClick={() => setMobileMenuOpen(false)}
+              className="px-3 py-2 rounded-lg hover:bg-zinc-900 hover:text-orange-400"
+            >
+              ⭐ Club Moro&apos;s (Clientes Fieles)
             </Link>
             <Link
               href="/#nosotros"

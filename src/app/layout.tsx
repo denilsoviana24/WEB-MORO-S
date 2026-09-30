@@ -8,6 +8,7 @@ import CartDrawer from '@/components/CartDrawer';
 import Intro from '@/components/Intro';
 import BurgerCursor from '@/components/BurgerCursor';
 import FlyToCart from '@/components/FlyToCart';
+import ReserveButton from '@/components/ReserveButton';
 
 const outfit = Outfit({
   subsets: ['latin'],
@@ -57,6 +58,7 @@ export default function RootLayout({
             <main className="flex-1">{children}</main>
             <Footer />
             <CartDrawer />
+            <ReserveButton />
           </div>
         </CartProvider>
       </body>

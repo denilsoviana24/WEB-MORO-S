@@ -1,4 +1,5 @@
 import PromoBanner from '@/components/PromoBanner';
+import LoyaltySection from '@/components/LoyaltySection';
 import MenuSection from '@/components/MenuSection';
 
 export const metadata = {
@@ -10,6 +11,7 @@ export default function PromocionesPage() {
   return (
     <div className="pt-8">
       <PromoBanner />
+      <LoyaltySection />
       <MenuSection />
     </div>
   );

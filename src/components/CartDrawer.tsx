@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
-import confetti from 'canvas-confetti';
-import { X, Plus, Minus, Trash2, ShoppingBag, Send, MapPin, Store, User, Phone, FileText } from 'lucide-react';
+import { X, Plus, Minus, Trash2, ShoppingBag, ArrowRight, MapPin, Store, User, Phone, FileText } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { RESTAURANT_INFO } from '@/data/menuData';
+import CheckoutPayment from '@/components/CheckoutPayment';
 
 export default function CartDrawer() {
   const { cart, isCartOpen, setIsCartOpen, removeFromCart, updateQuantity, clearCart, subtotal, totalItems } = useCart();
@@ -14,10 +14,16 @@ export default function CartDrawer() {
   const [customerPhone, setCustomerPhone] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [orderNotes, setOrderNotes] = useState('');
+  const [step, setStep] = useState<'cart' | 'pay'>('cart');
+
+  // Al abrir el carrito, siempre empezar en el paso del pedido
+  useEffect(() => {
+    if (isCartOpen) setStep('cart');
+  }, [isCartOpen]);
 
   if (!isCartOpen) return null;
 
-  const handleCheckout = (e: React.FormEvent) => {
+  const handleContinueToPay = (e: React.FormEvent) => {
     e.preventDefault();
 
     if (cart.length === 0) return;
@@ -32,48 +38,8 @@ export default function CartDrawer() {
       return;
     }
 
-    // Trigger celebratory confetti!
-    confetti({
-      particleCount: 80,
-      spread: 70,
-      origin: { y: 0.6 },
-    });
-
-    // Format WhatsApp Message
-    let message = `*🍔 NUEVO PEDIDO - MORO'S COMIDAS RÁPIDAS*\n`;
-    message += `-----------------------------------------\n`;
-    message += `*Cliente:* ${customerName}\n`;
-    if (customerPhone) message += `*Teléfono:* ${customerPhone}\n`;
-    message += `*Tipo de Pedido:* ${deliveryType === 'delivery' ? '🛵 ENTREGA A DOMICILIO' : '📍 RETIRO EN LOCAL'}\n`;
-
-    if (deliveryType === 'delivery') {
-      message += `*Dirección:* ${deliveryAddress}\n`;
-    }
-
-    message += `\n*DETALLE DEL PEDIDO:*\n`;
-    cart.forEach((item, index) => {
-      const optionText = item.selectedOption ? ` (${item.selectedOption.size})` : '';
-      const price = item.selectedOption ? item.selectedOption.price : item.product.price;
-      message += `${index + 1}. *${item.quantity}x ${item.product.name}*${optionText} - $${(price * item.quantity).toFixed(2)}\n`;
-      if (item.notes) {
-        message += `   _Nota: ${item.notes}_\n`;
-      }
-    });
-
-    if (orderNotes) {
-      message += `\n*Notas Generales:* ${orderNotes}\n`;
-    }
-
-    message += `-----------------------------------------\n`;
-    message += `*TOTAL A PAGAR:* $${subtotal.toFixed(2)}\n`;
-    message += `-----------------------------------------\n`;
-    message += `¡Gracias por preferir Moro's! Quedo a la espera de su confirmación.`;
-
-    const encodedMessage = encodeURIComponent(message);
-    const whatsappUrl = `https://wa.me/${RESTAURANT_INFO.whatsappFormatted}?text=${encodedMessage}`;
-
-    // Open WhatsApp in new tab
-    window.open(whatsappUrl, '_blank');
+    // Ir al paso de pago (aquí eliges: efectivo, transferencia o tarjeta)
+    setStep('pay');
   };
 
   return (
@@ -109,7 +75,18 @@ export default function CartDrawer() {
 
           {/* Drawer Body - Cart Items & Form */}
           <div className="flex-1 overflow-y-auto p-5 space-y-6">
-            {cart.length === 0 ? (
+            {step === 'pay' ? (
+              <CheckoutPayment
+                cart={cart}
+                subtotal={subtotal}
+                deliveryType={deliveryType}
+                customerName={customerName}
+                customerPhone={customerPhone}
+                deliveryAddress={deliveryAddress}
+                orderNotes={orderNotes}
+                onBack={() => setStep('cart')}
+              />
+            ) : cart.length === 0 ? (
               <div className="text-center py-16 space-y-4">
                 <ShoppingBag className="w-16 h-16 text-zinc-700 mx-auto" />
                 <h3 className="text-base font-bold text-zinc-300">Aún no has agregado productos</h3>
@@ -296,7 +273,7 @@ export default function CartDrawer() {
           </div>
 
           {/* Drawer Footer */}
-          {cart.length > 0 && (
+          {cart.length > 0 && step === 'cart' && (
             <div className="p-5 border-t border-zinc-900 bg-zinc-900/60 space-y-4">
               <div className="space-y-1 text-xs">
                 <div className="flex justify-between text-zinc-400">
@@ -316,11 +293,11 @@ export default function CartDrawer() {
               </div>
 
               <button
-                onClick={handleCheckout}
-                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3.5 px-4 rounded-2xl flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:scale-[1.02] active:scale-95 transition-all text-sm"
+                onClick={handleContinueToPay}
+                className="w-full bg-gradient-to-r from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-400 text-zinc-950 font-black py-3.5 px-4 rounded-2xl flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(255,85,0,0.35)] hover:scale-[1.02] active:scale-95 transition-all text-sm"
               >
-                <Send className="w-4 h-4" />
-                <span>CONFIRMAR Y PEDIR POR WHATSAPP</span>
+                <span>CONTINUAR AL PAGO</span>
+                <ArrowRight className="w-4 h-4" />
               </button>
             </div>
           )}
