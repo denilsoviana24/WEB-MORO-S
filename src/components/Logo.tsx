@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { friesRain } from '@/lib/friesRain';
 
 // Rutas del logo real (el usuario debe guardar su imagen como public/logo-moros.png)
 const CANDIDATES = ['/logo-moros.png', '/logo-moros.jpg', '/logo.png', '/logo.jpg'];
@@ -29,16 +30,35 @@ export default function Logo({ className = 'h-12 w-12' }: { className?: string }
   const [idx, setIdx] = useState(0);
   const [failed, setFailed] = useState(false);
 
+  // Al hacer clic en el logo: lluvia de mini papitas 🍟
+  const handleClick = (e: React.MouseEvent) => {
+    try {
+      const x = e.clientX / window.innerWidth;
+      const y = e.clientY / window.innerHeight;
+      friesRain(x, y);
+    } catch {
+      friesRain();
+    }
+  };
+
   if (failed) {
     return (
-      <span className={`relative overflow-hidden rounded-full ${className}`}>
+      <span
+        className={`relative overflow-hidden rounded-full cursor-pointer active:scale-90 transition-transform ${className}`}
+        onClick={handleClick}
+        title="¡Lluvia de papitas! 🍟"
+      >
         <BadgeFallback />
       </span>
     );
   }
 
   return (
-    <span className={`relative block overflow-hidden rounded-full bg-zinc-950 ${className}`}>
+    <span
+      className={`relative block overflow-hidden rounded-full bg-zinc-950 cursor-pointer active:scale-90 transition-transform ${className}`}
+      onClick={handleClick}
+      title="¡Lluvia de papitas! 🍟"
+    >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={CANDIDATES[idx]}
