@@ -7,11 +7,12 @@ import { CATEGORIES, MENU_ITEMS, MenuItem } from '@/data/menuData';
 type Props = {
   openId: string | null;
   onSelect: (id: string) => void;
-  onOpenItem: (item: MenuItem) => void;
+  onOpenProduct: (item: MenuItem, catId: string) => void;
 };
 
-export default function MenuGalaxy({ openId, onSelect, onOpenItem }: Props) {
+export default function MenuGalaxy({ openId, onSelect, onOpenProduct }: Props) {
   const [revealed, setRevealed] = useState(false);
+  const [expandAll, setExpandAll] = useState(false);
   const [hoverId, setHoverId] = useState<string | null>(null);
 
   const groups = useMemo(
@@ -165,26 +166,42 @@ export default function MenuGalaxy({ openId, onSelect, onOpenItem }: Props) {
         })}
       </svg>
 
-      {/* Núcleo central */}
-      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
+      {/* Núcleo central: Hamburguesa completa Moro's (clic = expandir productos) */}
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
         <div
-          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-56 h-56 sm:w-72 sm:h-72 rounded-full blur-2xl"
+          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-56 h-56 sm:w-72 sm:h-72 rounded-full blur-2xl pointer-events-none"
           style={{ background: 'radial-gradient(circle, rgba(255,190,80,0.55), transparent 65%)' }}
         />
-        <motion.div
+        <motion.button
+          onClick={(e) => {
+            e.stopPropagation();
+            reveal();
+            setExpandAll((v) => !v);
+          }}
           animate={{ scale: [1, 1.08, 1] }}
           transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut' }}
-          className="relative w-24 h-24 sm:w-32 sm:h-32 rounded-full bg-gradient-to-br from-amber-200 via-orange-400 to-orange-700 shadow-[0_0_100px_30px_rgba(255,150,40,0.55)] flex items-center justify-center"
+          whileTap={{ scale: 0.9 }}
+          title={expandAll ? 'Contraer productos' : 'Toca para ver todos los productos'}
+          aria-label="Hamburguesa Moro's: mostrar todos los productos"
+          className="relative block w-28 h-28 sm:w-40 sm:h-40 rounded-full overflow-hidden border-4 border-amber-300/80 shadow-[0_0_100px_30px_rgba(255,150,40,0.55)] focus:outline-none"
         >
-          <span className="text-2xl sm:text-4xl font-black text-zinc-950 tracking-tighter">M</span>
-        </motion.div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=400&q=70"
+            alt="Hamburguesa completa Moro's"
+            className="w-full h-full object-cover"
+          />
+        </motion.button>
+        <p className="absolute left-1/2 top-full mt-2 -translate-x-1/2 whitespace-nowrap rounded-full border border-amber-400/40 bg-zinc-950/90 px-3 py-1 text-[10px] font-black text-amber-300 pointer-events-none">
+          🍔 Tócame: {expandAll ? 'ocultar productos' : 'ver todos los productos'}
+        </p>
       </div>
 
       {/* Nodos: categorías como estrellas */}
       {groups.map((g, i) => {
         const p = pos(i);
         const active = openId === g.cat.id;
-        const showItems = revealed && (hoverId === g.cat.id || active);
+        const showItems = revealed && (expandAll || hoverId === g.cat.id || active);
         return (
           <motion.div
             key={g.cat.id}
@@ -254,9 +271,9 @@ export default function MenuGalaxy({ openId, onSelect, onOpenItem }: Props) {
                       }}
                       onClick={(e) => {
                         e.stopPropagation();
-                        onOpenItem(item);
+                        onOpenProduct(item, g.cat.id);
                       }}
-                      title={item.name}
+                      title={`${item.name} · ver en el menú`}
                       className="group/star absolute -translate-x-1/2 -translate-y-1/2 z-10"
                     >
                       <span className="block w-10 h-10 rounded-full overflow-hidden border-2 border-amber-400/70 shadow-[0_0_16px_rgba(255,170,40,0.55)] transition-transform group-hover/star:scale-125 bg-zinc-900">

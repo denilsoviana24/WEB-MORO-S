@@ -47,7 +47,7 @@ export default function MenuSection() {
             Sabor Exquisito en <span className="bg-gradient-to-r from-orange-500 to-amber-400 bg-clip-text text-transparent">Cada Bocado</span>
           </h2>
           <p className="text-zinc-400 text-sm sm:text-base leading-relaxed">
-            Pasa el mouse por la galaxia: cada categoría es una estrella y sus platos salen como una constelación. Toca una para desplegarla.
+            Toca la hamburguesa del centro para desplegar todos los productos, o toca una estrella para ver su categoría. Cada producto te lleva a su sección del menú.
           </p>
         </Reveal>
 
@@ -113,7 +113,15 @@ export default function MenuSection() {
                     ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }, 150);
               }}
-              onOpenItem={(it) => setActiveModalItem(it)}
+              onOpenProduct={(_it, catId) => {
+                // Clic en un producto: abre su sección del menú y baja hasta ella
+                setOpenCategory(catId);
+                setTimeout(() => {
+                  document
+                    .getElementById('menu-detail')
+                    ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 150);
+              }}
             />
 
             {/* Accordion Content Panels */}
