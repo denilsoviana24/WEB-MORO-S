@@ -5,6 +5,11 @@ export interface LoyaltyTier {
   visits: string;
   color: string;
   border: string;
+  dish: {
+    name: string;
+    tag: string;
+    image: string;
+  };
   benefits: string[];
 }
 
@@ -33,9 +38,14 @@ export const LOYALTY_TIERS: LoyaltyTier[] = [
     visits: '1 - 6 visitas',
     color: 'from-amber-700 via-amber-600 to-yellow-700',
     border: 'border-amber-700/50',
+    dish: {
+      name: 'Salchipapa Clásica',
+      tag: 'Plato de bienvenida GRATIS',
+      image: 'https://images.unsplash.com/photo-1585109649139-366815a0d713?auto=format&fit=crop&w=400&q=70',
+    },
     benefits: [
+      'Salchipapa Clásica GRATIS',
       'Tarjeta fiel con sellos por visita',
-      'Bebida gratis en tu cumpleaños',
       'Acceso a promos de la semana',
     ],
   },
@@ -46,10 +56,15 @@ export const LOYALTY_TIERS: LoyaltyTier[] = [
     visits: '7 - 14 visitas',
     color: 'from-zinc-400 via-zinc-300 to-zinc-500',
     border: 'border-zinc-400/50',
+    dish: {
+      name: 'Bebida Grande',
+      tag: 'Gaseosa grande GRATIS',
+      image: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?auto=format&fit=crop&w=400&q=70',
+    },
     benefits: [
+      'Bebida Grande GRATIS',
       'Todo lo de Bronce',
       '10% OFF todos los martes',
-      'Papas extra gratis en combos',
     ],
   },
   {
@@ -59,11 +74,15 @@ export const LOYALTY_TIERS: LoyaltyTier[] = [
     visits: '15+ visitas',
     color: 'from-yellow-500 via-amber-400 to-orange-500',
     border: 'border-amber-400/60',
+    dish: {
+      name: 'Picaditas de Pollo',
+      tag: 'Plato premium GRATIS',
+      image: 'https://images.unsplash.com/photo-1569058242253-92a9c755a0ec?auto=format&fit=crop&w=400&q=70',
+    },
     benefits: [
+      'Picaditas de Pollo GRATIS',
       'Todo lo de Plata',
       '15% OFF todos los días',
-      'Postre o bebida gratis cada mes',
-      'Atención prioritaria en reservas',
     ],
   },
 ];

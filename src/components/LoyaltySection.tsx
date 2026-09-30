@@ -235,6 +235,21 @@ export default function LoyaltySection() {
                     </div>
                     <h3 className="mt-3 font-black text-white">{tier.name}</h3>
                     <p className="text-[11px] font-bold text-amber-400 uppercase tracking-wider">{tier.visits}</p>
+                    <div className="mt-3 rounded-2xl overflow-hidden border border-zinc-700/60">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={tier.dish.image}
+                        alt={tier.dish.name}
+                        className="h-20 w-full object-cover"
+                        loading="lazy"
+                      />
+                      <div className="bg-zinc-950/90 px-3 py-2">
+                        <p className="text-[10px] font-black uppercase tracking-wider text-amber-400">
+                          {tier.dish.tag}
+                        </p>
+                        <p className="text-xs font-extrabold text-white">{tier.dish.name}</p>
+                      </div>
+                    </div>
                     <ul className="mt-3 space-y-1.5">
                       {tier.benefits.map((b) => (
                         <li key={b} className="text-xs text-zinc-300 flex gap-1.5">
