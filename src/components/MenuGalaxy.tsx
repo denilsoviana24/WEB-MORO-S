@@ -248,11 +248,8 @@ export default function MenuGalaxy({ openId, onSelect, onOpenProduct }: Props) {
                 title={`${ing.label} · ir a su categoría`}
                 className="absolute -translate-x-1/2 -translate-y-1/2 z-20 flex flex-col items-center focus:outline-none"
               >
-                <span className="text-2xl sm:text-3xl drop-shadow-[0_0_12px_rgba(255,170,40,0.7)]">
+                <span className="text-3xl sm:text-4xl drop-shadow-[0_0_12px_rgba(255,170,40,0.7)]">
                   {ing.emoji}
-                </span>
-                <span className="mt-1 whitespace-nowrap rounded-full border border-amber-400/40 bg-zinc-950/90 px-2 py-0.5 text-[9px] font-black text-amber-300">
-                  {ing.label}
                 </span>
               </motion.button>
             );
