@@ -47,7 +47,7 @@ export default function MenuSection() {
             Sabor Exquisito en <span className="bg-gradient-to-r from-orange-500 to-amber-400 bg-clip-text text-transparent">Cada Bocado</span>
           </h2>
           <p className="text-zinc-400 text-sm sm:text-base leading-relaxed">
-            Toca la hamburguesa del centro para desplegar todos los productos, o toca una estrella para ver su categoría. Cada producto te lleva a su sección del menú.
+            Toca la hamburguesa para desarmarla: el pan vuela a las picaditas, el tomate a las bebidas… y cada ingrediente te lleva a su categoría del menú.
           </p>
         </Reveal>
 

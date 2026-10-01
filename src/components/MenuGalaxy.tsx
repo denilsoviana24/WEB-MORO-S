@@ -10,9 +10,23 @@ type Props = {
   onOpenProduct: (item: MenuItem, catId: string) => void;
 };
 
+// Cada ingrediente de la hamburguesa vuela a su categoría al desarmarla
+const INGREDIENTS = [
+  { emoji: '🍞', label: 'Pan', catId: 'picaditas' },
+  { emoji: '🧀', label: 'Queso', catId: 'hamburguesas' },
+  { emoji: '🥩', label: 'Carne', catId: 'bbq' },
+  { emoji: '🥬', label: 'Lechuga', catId: 'salchipapas' },
+  { emoji: '🍅', label: 'Tomate', catId: 'bebidas' },
+  { emoji: '🧅', label: 'Cebolla', catId: 'hot-dog' },
+  { emoji: '🥓', label: 'Tocino', catId: 'papi-mixtas' },
+  { emoji: '🍳', label: 'Huevo', catId: 'papi-completas' },
+  { emoji: '🍗', label: 'Pollo crispy', catId: 'broaster' },
+  { emoji: '🧂', label: 'Salsa', catId: 'gallina' },
+];
+
 export default function MenuGalaxy({ openId, onSelect, onOpenProduct }: Props) {
   const [revealed, setRevealed] = useState(false);
-  const [expandAll, setExpandAll] = useState(false);
+  const [dispersed, setDispersed] = useState(false);
   const [hoverId, setHoverId] = useState<string | null>(null);
 
   const groups = useMemo(
@@ -65,6 +79,14 @@ export default function MenuGalaxy({ openId, onSelect, onOpenProduct }: Props) {
   };
 
   const reveal = () => setRevealed(true);
+
+  // Posición de aterrizaje de un ingrediente: entre el centro y su categoría
+  const ingredientPos = (catId: string) => {
+    const gi = groups.findIndex((g) => g.cat.id === catId);
+    if (gi < 0) return { x: 50, y: 50 };
+    const p = pos(gi);
+    return { x: 50 + (p.x - 50) * 0.68, y: 50 + (p.y - 50) * 0.68 };
+  };
 
   return (
     <div
@@ -166,7 +188,7 @@ export default function MenuGalaxy({ openId, onSelect, onOpenProduct }: Props) {
         })}
       </svg>
 
-      {/* Núcleo central: Hamburguesa completa Moro's (clic = expandir productos) */}
+      {/* Núcleo central: Hamburguesa flotante sin fondo (clic = desarmarla) */}
       <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
         <div
           className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-56 h-56 sm:w-72 sm:h-72 rounded-full blur-2xl pointer-events-none"
@@ -176,32 +198,72 @@ export default function MenuGalaxy({ openId, onSelect, onOpenProduct }: Props) {
           onClick={(e) => {
             e.stopPropagation();
             reveal();
-            setExpandAll((v) => !v);
+            setDispersed((v) => !v);
           }}
-          animate={{ scale: [1, 1.08, 1] }}
-          transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut' }}
+          animate={dispersed ? { scale: 0.55, opacity: 0.3 } : { scale: [1, 1.08, 1], opacity: 1 }}
+          transition={
+            dispersed
+              ? { duration: 0.4 }
+              : { duration: 3.2, repeat: Infinity, ease: 'easeInOut' }
+          }
           whileTap={{ scale: 0.9 }}
-          title={expandAll ? 'Contraer productos' : 'Toca para ver todos los productos'}
-          aria-label="Hamburguesa Moro's: mostrar todos los productos"
-          className="relative block w-28 h-28 sm:w-40 sm:h-40 rounded-full overflow-hidden border-4 border-amber-300/80 shadow-[0_0_100px_30px_rgba(255,150,40,0.55)] focus:outline-none"
+          title={dispersed ? 'Armar la hamburguesa' : 'Toca para desarmar la hamburguesa'}
+          aria-label="Hamburguesa Moro's: desarmar en ingredientes"
+          className="relative block w-44 h-44 sm:w-60 sm:h-60 focus:outline-none"
+          style={{ filter: 'drop-shadow(0 25px 45px rgba(255,140,30,0.45))' }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=400&q=70"
+            src="https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=500&q=70"
             alt="Hamburguesa completa Moro's"
             className="w-full h-full object-cover"
+            style={{
+              WebkitMaskImage: 'radial-gradient(circle at 50% 50%, black 56%, transparent 72%)',
+              maskImage: 'radial-gradient(circle at 50% 50%, black 56%, transparent 72%)',
+            }}
           />
         </motion.button>
         <p className="absolute left-1/2 top-full mt-2 -translate-x-1/2 whitespace-nowrap rounded-full border border-amber-400/40 bg-zinc-950/90 px-3 py-1 text-[10px] font-black text-amber-300 pointer-events-none">
-          🍔 Tócame: {expandAll ? 'ocultar productos' : 'ver todos los productos'}
+          🍔 Tócame: {dispersed ? 'armar la hamburguesa' : 'desarmar la hamburguesa'}
         </p>
       </div>
+
+      {/* Ingredientes dispersos: vuelan del centro a su categoría */}
+      <AnimatePresence>
+        {revealed &&
+          dispersed &&
+          INGREDIENTS.map((ing, k) => {
+            const t = ingredientPos(ing.catId);
+            return (
+              <motion.button
+                key={ing.catId}
+                initial={{ left: '50%', top: '50%', opacity: 0, scale: 0.3 }}
+                animate={{ left: `${t.x}%`, top: `${t.y}%`, opacity: 1, scale: 1 }}
+                exit={{ left: '50%', top: '50%', opacity: 0, scale: 0.3 }}
+                transition={{ type: 'spring', stiffness: 110, damping: 15, delay: 0.1 + k * 0.07 }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelect(ing.catId);
+                }}
+                title={`${ing.label} · ir a su categoría`}
+                className="absolute -translate-x-1/2 -translate-y-1/2 z-20 flex flex-col items-center focus:outline-none"
+              >
+                <span className="text-2xl sm:text-3xl drop-shadow-[0_0_12px_rgba(255,170,40,0.7)]">
+                  {ing.emoji}
+                </span>
+                <span className="mt-1 whitespace-nowrap rounded-full border border-amber-400/40 bg-zinc-950/90 px-2 py-0.5 text-[9px] font-black text-amber-300">
+                  {ing.label}
+                </span>
+              </motion.button>
+            );
+          })}
+      </AnimatePresence>
 
       {/* Nodos: categorías como estrellas */}
       {groups.map((g, i) => {
         const p = pos(i);
         const active = openId === g.cat.id;
-        const showItems = revealed && (expandAll || hoverId === g.cat.id || active);
+        const showItems = revealed && (dispersed || hoverId === g.cat.id || active);
         return (
           <motion.div
             key={g.cat.id}
