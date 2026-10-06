@@ -18,6 +18,11 @@ import {
   PAYMENT_METHODS,
   BANK_ACCOUNT,
   MERCADOPAGO_LINK,
+  KUSHKI_PAYMENT_LINK,
+  KUSHKI_PUBLIC_KEY,
+  KUSHKI_ENV,
+  DEUNA_LINK,
+  DEUNA_QR,
   type PaymentMethodId,
 } from '@/data/paymentData';
 
@@ -37,7 +42,42 @@ const METHOD_LABEL: Record<PaymentMethodId, string> = {
   cash: 'Efectivo (paga al recibir / en local)',
   transfer: 'Transferencia bancaria',
   card: 'Tarjeta en línea (Mercado Pago)',
+  kushki: 'Tarjeta en línea (Kushki)',
+  deuna: 'DeUna (Banco Pichincha)',
 };
+
+interface KushkiInstance {
+  requestToken: (
+    params: Record<string, unknown>,
+    cb: (res: { token?: string; message?: string }) => void
+  ) => void;
+}
+
+function loadKushkiScript(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if ((window as unknown as { Kushki?: unknown }).Kushki) return resolve();
+    const s = document.createElement('script');
+    s.src = 'https://cdn.kushkipagos.com/kushki.min.js';
+    s.async = true;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error('cdn'));
+    document.head.appendChild(s);
+  });
+}
+
+function getKushki(publicId: string): KushkiInstance | null {
+  const K = (
+    window as unknown as {
+      Kushki?: new (cfg: { merchantId: string; inTestEnvironment: boolean }) => KushkiInstance;
+    }
+  ).Kushki;
+  if (!K) return null;
+  try {
+    return new K({ merchantId: publicId, inTestEnvironment: KUSHKI_ENV !== 'production' });
+  } catch {
+    return null;
+  }
+}
 
 export default function CheckoutPayment({
   cart,
@@ -54,6 +94,13 @@ export default function CheckoutPayment({
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState('');
   const [copied, setCopied] = useState<string | null>(null);
+  // Formulario de tarjeta (Kushki)
+  const [cardName, setCardName] = useState('');
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardExpMM, setCardExpMM] = useState('');
+  const [cardExpYY, setCardExpYY] = useState('');
+  const [cardCvc, setCardCvc] = useState('');
+  const [qrOk, setQrOk] = useState(true);
 
   const buildMessage = (extra?: string) => {
     let message = `*🍔 NUEVO PEDIDO - MORO'S COMIDAS RÁPIDAS*\n`;
@@ -120,8 +167,7 @@ export default function CheckoutPayment({
     setTimeout(() => setCopied(null), 2000);
   };
 
-  const handleCardPay = async () => {
-    setPayError('');
+  const handleCardPay = async () => {    setPayError('');
     // Plan A: link de pago fijo configurado por el dueño
     if (MERCADOPAGO_LINK) {
       window.open(MERCADOPAGO_LINK, '_blank');
@@ -167,6 +213,80 @@ export default function CheckoutPayment({
       setPaying(false);
     }
   };
+
+  // Pago con tarjeta vía Kushki (link rápido o cobro integrado)
+  const handleKushkiPay = async () => {
+    setPayError('');
+    if (KUSHKI_PAYMENT_LINK) {
+      window.open(KUSHKI_PAYMENT_LINK, '_blank');
+      return;
+    }
+    if (!KUSHKI_PUBLIC_KEY) {
+      setPayError('El pago con Kushki aún no está activado. Completa tu pedido por WhatsApp y coordinamos el pago. 🙏');
+      return;
+    }
+    const num = cardNumber.replace(/\D/g, '');
+    if (cardName.trim().length < 3) {
+      setPayError('Escribe el nombre que aparece en la tarjeta.');
+      return;
+    }
+    if (num.length < 13 || num.length > 19) {
+      setPayError('El número de tarjeta no es válido.');
+      return;
+    }
+    if (!/^(0[1-9]|1[0-2])$/.test(cardExpMM)) {
+      setPayError('Mes de vencimiento inválido (01 a 12).');
+      return;
+    }
+    if (!/^\d{2}$/.test(cardExpYY)) {
+      setPayError('Año de vencimiento inválido (2 dígitos, Ej. 28).');
+      return;
+    }
+    if (!/^\d{3,4}$/.test(cardCvc)) {
+      setPayError('Código de seguridad inválido.');
+      return;
+    }
+    setPaying(true);
+    try {
+      await loadKushkiScript();
+      const kushki = getKushki(KUSHKI_PUBLIC_KEY);
+      if (!kushki) throw new Error('init');
+      const token: string = await new Promise((resolve, reject) => {
+        kushki.requestToken(
+          {
+            amount: Number(subtotal.toFixed(2)),
+            currency: 'USD',
+            card: {
+              name: cardName.trim(),
+              number: num,
+              cvc: cardCvc,
+              expiryMonth: cardExpMM,
+              expiryYear: cardExpYY,
+            },
+          },
+          (res) => (res.token ? resolve(res.token) : reject(new Error(res.message || 'token')))
+        );
+      });
+      const r = await fetch('/api/pagos/kushki', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, amount: Number(subtotal.toFixed(2)) }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || !d.approved) {
+        setPayError(d?.message || 'La tarjeta fue rechazada. Verifica los datos o usa otro método.');
+        return;
+      }
+      completeOrder(`✅ Pago aprobado con tarjeta vía Kushki${d.ticket ? ` (Ticket ${d.ticket})` : ''}.`);
+    } catch {
+      setPayError('No se pudo procesar la tarjeta. Revisa los datos o usa otro método.');
+    } finally {
+      setPaying(false);
+    }
+  };
+
+  const cardInputCls =
+    'w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-orange-500';
 
   return (
     <div className="space-y-4">
@@ -240,7 +360,7 @@ export default function CheckoutPayment({
         </div>
       )}
 
-      {/* Panel: tarjeta */}
+      {/* Panel: Mercado Pago */}
       {method === 'card' && (
         <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
           <div className="flex items-center gap-2 text-xs text-zinc-300">
@@ -250,6 +370,107 @@ export default function CheckoutPayment({
           {payError && (
             <p className="mt-3 text-xs font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-xl px-3 py-2">
               {payError}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Panel: Kushki */}
+      {method === 'kushki' && (
+        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4 space-y-3">
+          <div className="flex items-center gap-2 text-xs text-zinc-300">
+            <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>Pago 100% seguro con Kushki. Acepta débito, crédito y más.</span>
+          </div>
+
+          {!KUSHKI_PAYMENT_LINK && KUSHKI_PUBLIC_KEY && (
+            <>
+              <input
+                type="text"
+                placeholder="Nombre en la tarjeta"
+                value={cardName}
+                onChange={(e) => setCardName(e.target.value)}
+                className={cardInputCls}
+              />
+              <input
+                type="text"
+                inputMode="numeric"
+                placeholder="Número de tarjeta"
+                value={cardNumber}
+                onChange={(e) =>
+                  setCardNumber(
+                    e.target.value.replace(/\D/g, '').slice(0, 16).replace(/(\d{4})(?=\d)/g, '$1 ')
+                  )
+                }
+                className={cardInputCls}
+              />
+              <div className="grid grid-cols-3 gap-2">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="MM"
+                  value={cardExpMM}
+                  onChange={(e) => setCardExpMM(e.target.value.replace(/\D/g, '').slice(0, 2))}
+                  className={cardInputCls}
+                />
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="AA"
+                  value={cardExpYY}
+                  onChange={(e) => setCardExpYY(e.target.value.replace(/\D/g, '').slice(0, 2))}
+                  className={cardInputCls}
+                />
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  placeholder="CVC"
+                  value={cardCvc}
+                  onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                  className={cardInputCls}
+                />
+              </div>
+              {KUSHKI_ENV !== 'production' && (
+                <p className="text-[11px] text-zinc-500">🧪 Modo pruebas: usa una tarjeta de test de Kushki.</p>
+              )}
+            </>
+          )}
+
+          {payError && (
+            <p className="text-xs font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-xl px-3 py-2">
+              {payError}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Panel: DeUna */}
+      {method === 'deuna' && (
+        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4 space-y-3 text-center">
+          <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
+            Paga ${subtotal.toFixed(2)} con tu app DeUna 📱
+          </p>
+          {qrOk && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={DEUNA_QR}
+              alt="QR DeUna Moro's"
+              onError={() => setQrOk(false)}
+              className="w-40 h-40 mx-auto rounded-2xl border border-zinc-700 object-cover bg-white"
+            />
+          )}
+          {DEUNA_LINK ? (
+            <a
+              href={DEUNA_LINK}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block w-full bg-yellow-500 hover:bg-yellow-400 text-zinc-950 font-black py-3 px-4 rounded-2xl text-sm transition-all"
+            >
+              ABRIR MI LINK DEUNA
+            </a>
+          ) : (
+            <p className="text-[11px] text-zinc-500">
+              Escanea el QR del local con tu app DeUna y envíanos el comprobante 👇
             </p>
           )}
         </div>
@@ -287,6 +508,29 @@ export default function CheckoutPayment({
         >
           {paying ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
           <span>{paying ? 'CONECTANDO…' : `PAGAR $${subtotal.toFixed(2)} CON TARJETA`}</span>
+        </button>
+      )}
+
+      {method === 'kushki' && (
+        <button
+          type="button"
+          onClick={handleKushkiPay}
+          disabled={paying}
+          className="w-full bg-gradient-to-r from-violet-600 to-purple-500 hover:from-violet-500 hover:to-purple-400 text-white font-black py-3.5 px-4 rounded-2xl flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(139,92,246,0.35)] hover:scale-[1.02] active:scale-95 transition-all text-sm disabled:opacity-60"
+        >
+          {paying ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
+          <span>{paying ? 'PROCESANDO…' : `PAGAR $${subtotal.toFixed(2)} CON KUSHKI`}</span>
+        </button>
+      )}
+
+      {method === 'deuna' && (
+        <button
+          type="button"
+          onClick={() => completeOrder('📱 Pagado con DeUna, envío el comprobante.')}
+          className="w-full bg-yellow-500 hover:bg-yellow-400 text-zinc-950 font-black py-3.5 px-4 rounded-2xl flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(234,179,8,0.3)] hover:scale-[1.02] active:scale-95 transition-all text-sm"
+        >
+          <Send className="w-4 h-4" />
+          <span>YA PAGUÉ CON DEUNA — ENVIAR COMPROBANTE</span>
         </button>
       )}
     </div>
