@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Armchair, X, User, Phone, CalendarDays, Clock, Users, FileText, Send } from 'lucide-react';
 import { RESTAURANT_INFO } from '@/data/menuData';
@@ -22,6 +22,13 @@ export default function ReserveButton() {
   const [guests, setGuests] = useState('2');
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
+
+  // El asistente IA puede abrir este formulario ("quiero reservar mesa")
+  useEffect(() => {
+    const openReserve = () => setOpen(true);
+    window.addEventListener('moros:open-reserve', openReserve);
+    return () => window.removeEventListener('moros:open-reserve', openReserve);
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

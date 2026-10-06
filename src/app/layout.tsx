@@ -9,6 +9,7 @@ import Intro from '@/components/Intro';
 import BurgerCursor from '@/components/BurgerCursor';
 import FlyToCart from '@/components/FlyToCart';
 import ReserveButton from '@/components/ReserveButton';
+import AiAssistant from '@/components/AiAssistant';
 
 const outfit = Outfit({
   subsets: ['latin'],
@@ -59,6 +60,7 @@ export default function RootLayout({
             <Footer />
             <CartDrawer />
             <ReserveButton />
+            <AiAssistant />
           </div>
         </CartProvider>
       </body>
