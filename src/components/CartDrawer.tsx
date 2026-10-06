@@ -10,6 +10,7 @@ import OrderTicket, { type OrderData } from '@/components/OrderTicket';
 import { addLoyaltyStamp } from '@/lib/loyalty';
 import { STAMPS_GOAL } from '@/data/loyaltyData';
 import { friesRain } from '@/lib/friesRain';
+import { useAuth } from '@/context/AuthContext';
 
 export default function CartDrawer() {
   const { cart, isCartOpen, setIsCartOpen, removeFromCart, updateQuantity, clearCart, subtotal, totalItems } = useCart();
@@ -26,10 +27,16 @@ export default function CartDrawer() {
     if (isCartOpen) setStep('cart');
   }, [isCartOpen]);
 
-  // Pedido completado: suma 1 sello fiel, muestra comprobante, vacía carrito y cierra
-  const handleOrderComplete = (order: OrderData) => {
-    const { completed } = addLoyaltyStamp(STAMPS_GOAL);
-    if (completed) friesRain();
+  // Pedido completado: con sesión se guarda en Supabase + 1 sello; invitado = sello local
+  const { user, saveOrder } = useAuth();
+  const handleOrderComplete = async (order: OrderData) => {
+    if (user) {
+      const r = await saveOrder(order, STAMPS_GOAL);
+      if (r?.completed) friesRain();
+    } else {
+      const { completed } = addLoyaltyStamp(STAMPS_GOAL);
+      if (completed) friesRain();
+    }
     setTicket(order);
     clearCart();
     setIsCartOpen(false);

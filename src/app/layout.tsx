@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import { Outfit } from 'next/font/google';
 import './globals.css';
 import { CartProvider } from '@/context/CartContext';
+import { AuthProvider } from '@/context/AuthContext';
+import AuthModal from '@/components/AuthModal';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import CartDrawer from '@/components/CartDrawer';
@@ -51,6 +53,7 @@ export default function RootLayout({
     <html lang="es" className={`${outfit.variable} scroll-smooth`}>
       <body className="bg-zinc-950 text-zinc-100 antialiased font-sans selection:bg-orange-500 selection:text-zinc-950">
         <CartProvider>
+          <AuthProvider>
           <Intro />
           <BurgerCursor />
           <FlyToCart />
@@ -61,7 +64,9 @@ export default function RootLayout({
             <CartDrawer />
             <ReserveButton />
             <AiAssistant />
+            <AuthModal />
           </div>
+          </AuthProvider>
         </CartProvider>
       </body>
     </html>

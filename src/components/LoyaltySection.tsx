@@ -6,6 +6,7 @@ import { Crown, Copy, Check, Gift, Stamp, Ticket } from 'lucide-react';
 import Reveal from './Reveal';
 import { friesRain } from '@/lib/friesRain';
 import { getLoyaltyStamps, addLoyaltyStamp, resetLoyaltyStamps, LOYALTY_EVENT } from '@/lib/loyalty';
+import { useAuth } from '@/context/AuthContext';
 import {
   LOYALTY_TIERS,
   LOYALTY_PROMOS,
@@ -14,20 +15,24 @@ import {
 } from '@/data/loyaltyData';
 
 export default function LoyaltySection() {
-  const [stamps, setStamps] = useState(0);
+  const { user, profile, addStampCloud, resetStampsCloud, setAuthModalOpen } = useAuth();
+  const [localStamps, setLocalStamps] = useState(0);
   const [copied, setCopied] = useState<string | null>(null);
   const [owner, setOwner] = useState(false);
   const [taps, setTaps] = useState(0);
 
+  // Con sesión: sellos de la nube. Invitado: sellos del equipo.
+  const stamps = user ? (profile?.stamps ?? 0) : localStamps;
+
   // Carga inicial + se actualiza solo cuando el carrito suma un sello
   useEffect(() => {
-    setStamps(getLoyaltyStamps(STAMPS_GOAL));
+    setLocalStamps(getLoyaltyStamps(STAMPS_GOAL));
     try {
       if (sessionStorage.getItem('moros-owner') === '1') setOwner(true);
     } catch {
       // ignorar
     }
-    const refresh = () => setStamps(getLoyaltyStamps(STAMPS_GOAL));
+    const refresh = () => setLocalStamps(getLoyaltyStamps(STAMPS_GOAL));
     window.addEventListener(LOYALTY_EVENT, refresh);
     return () => window.removeEventListener(LOYALTY_EVENT, refresh);
   }, []);
@@ -61,15 +66,24 @@ export default function LoyaltySection() {
     }
   };
 
-  const addStamp = () => {
-    const { stamps: next, completed } = addLoyaltyStamp(STAMPS_GOAL);
-    setStamps(next);
-    if (completed) friesRain();
+  const addStamp = async () => {
+    if (user) {
+      const r = await addStampCloud(STAMPS_GOAL);
+      if (r?.completed) friesRain();
+    } else {
+      const { stamps: next, completed } = addLoyaltyStamp(STAMPS_GOAL);
+      setLocalStamps(next);
+      if (completed) friesRain();
+    }
   };
 
-  const claimReward = () => {
-    resetLoyaltyStamps();
-    setStamps(0);
+  const claimReward = async () => {
+    if (user) {
+      await resetStampsCloud();
+    } else {
+      resetLoyaltyStamps();
+      setLocalStamps(0);
+    }
   };
 
   const copyCode = async (code: string) => {
@@ -165,6 +179,16 @@ export default function LoyaltySection() {
               <p className="mt-4 text-xs text-zinc-400 leading-relaxed">
                 Muestra tu tarjeta en el local para sellar tu visita. Cada pedido en la web suma 1 sello automáticamente 🍟. Al completar los {STAMPS_GOAL} sellos reclamas tu premio.
               </p>
+
+              {/* Invitado: invitar a crear cuenta para no perder sellos */}
+              {!user && (
+                <button
+                  onClick={() => setAuthModalOpen(true)}
+                  className="mt-3 w-full text-xs font-black bg-sky-600/15 hover:bg-sky-600/25 border border-sky-500/40 text-sky-300 px-4 py-2.5 rounded-xl transition-colors"
+                >
+                  ☁️ Crear cuenta gratis para guardar mis sellos
+                </button>
+              )}
 
               {/* Botón de sellar: SOLO visible en modo dueño */}
               {owner && (

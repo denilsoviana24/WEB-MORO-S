@@ -3,14 +3,17 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ShoppingBag, Phone, Menu, X, Clock, MapPin, MessageCircle } from 'lucide-react';
+import { ShoppingBag, Phone, Menu, X, Clock, MapPin, MessageCircle, User, LogOut } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
+import { useAuth } from '@/context/AuthContext';
 import { RESTAURANT_INFO } from '@/data/menuData';
 import Logo from '@/components/Logo';
 
 export default function Header() {
   const { totalItems, setIsCartOpen } = useCart();
+  const { user, profile, signOut, setAuthModalOpen } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
   const [isOpenNow, setIsOpenNow] = useState(true);
 
   useEffect(() => {
@@ -98,6 +101,54 @@ export default function Header() {
 
         {/* Action Controls */}
         <div className="flex items-center gap-3">
+          {/* Cuenta / Login */}
+          <div className="relative">
+            <button
+              onClick={() => (user ? setAccountOpen((v) => !v) : setAuthModalOpen(true))}
+              className="w-10 h-10 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-orange-500 text-zinc-300 hover:text-white font-black flex items-center justify-center transition-all"
+              aria-label={user ? 'Mi cuenta' : 'Entrar a mi cuenta'}
+              title={user ? 'Mi cuenta' : 'Entrar / Crear cuenta'}
+            >
+              {user ? (
+                <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-400 to-orange-600 text-zinc-950 text-sm flex items-center justify-center">
+                  {((profile?.name || user.email || 'M')[0] || 'M').toUpperCase()}
+                </span>
+              ) : (
+                <User className="w-5 h-5" />
+              )}
+            </button>
+
+            {user && accountOpen && (
+              <div className="absolute right-0 top-full mt-2 w-60 bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl p-4 z-50 space-y-3">
+                <div className="min-w-0">
+                  <p className="font-black text-white text-sm truncate">{profile?.name || 'Cliente Moro’s'}</p>
+                  <p className="text-[11px] text-zinc-500 truncate">{user.email}</p>
+                </div>
+                <div className="bg-zinc-950 border border-amber-500/30 rounded-xl px-3 py-2 flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-zinc-400">Mis sellos 🍟</span>
+                  <span className="text-sm font-black text-amber-400">{profile?.stamps ?? 0}/20</span>
+                </div>
+                <Link
+                  href="/promociones#club-moros"
+                  onClick={() => setAccountOpen(false)}
+                  className="block text-center text-xs font-black bg-zinc-800 hover:bg-zinc-700 text-white py-2 rounded-xl transition-colors"
+                >
+                  Ver mi tarjeta fiel
+                </Link>
+                <button
+                  onClick={async () => {
+                    await signOut();
+                    setAccountOpen(false);
+                  }}
+                  className="w-full flex items-center justify-center gap-1.5 text-xs font-bold text-zinc-500 hover:text-red-400 py-1 transition-colors"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>Cerrar sesión</span>
+                </button>
+              </div>
+            )}
+          </div>
+
           {/* WhatsApp Direct Quick Action */}
           <a
             href={`https://wa.me/${RESTAURANT_INFO.whatsappFormatted}?text=Hola%20Moro's!%20Quiero%20hacer%20un%20pedido`}
