@@ -15,9 +15,10 @@ import {
 } from '@/data/loyaltyData';
 
 export default function LoyaltySection() {
-  const { user, profile, addStampCloud, resetStampsCloud, setAuthModalOpen } = useAuth();
+  const { user, profile, addStampCloud, resetStampsCloud, redeemReward, setAuthModalOpen } = useAuth();
   const [localStamps, setLocalStamps] = useState(0);
   const [copied, setCopied] = useState<string | null>(null);
+  const [claimedMsg, setClaimedMsg] = useState('');
   const [owner, setOwner] = useState(false);
   const [taps, setTaps] = useState(0);
 
@@ -79,7 +80,14 @@ export default function LoyaltySection() {
 
   const claimReward = async () => {
     if (user) {
-      await resetStampsCloud();
+      const r = await redeemReward(STAMPS_REWARD.code, STAMPS_REWARD.title, STAMPS_GOAL);
+      if (r.ok) {
+        setClaimedMsg(r.message);
+        window.setTimeout(() => setClaimedMsg(''), 8000);
+      } else {
+        setClaimedMsg(r.message);
+        window.setTimeout(() => setClaimedMsg(''), 5000);
+      }
     } else {
       resetLoyaltyStamps();
       setLocalStamps(0);
@@ -147,6 +155,11 @@ export default function LoyaltySection() {
                     👑 Modo dueño · salir
                   </button>
                 </div>
+              )}
+              {claimedMsg && (
+                <p className="mt-2 text-xs font-black text-center text-emerald-400 bg-emerald-500/10 border border-emerald-500/40 rounded-xl px-3 py-2">
+                  {claimedMsg}
+                </p>
               )}
 
               {/* progreso */}

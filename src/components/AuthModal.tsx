@@ -2,14 +2,13 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, User, Mail, Lock, LogIn, UserPlus, Loader2 } from 'lucide-react';
+import { X, User, Lock, LogIn, UserPlus, Loader2 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
 export default function AuthModal() {
   const { isAuthModalOpen, setAuthModalOpen, signIn, signUp, supabaseReady } = useAuth();
   const [tab, setTab] = useState<'login' | 'register'>('login');
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -25,16 +24,12 @@ export default function AuthModal() {
     e.preventDefault();
     setError('');
     setSuccess('');
-    if (!email.trim() || !password) {
-      setError('Completa correo y contraseña.');
-      return;
-    }
-    if (tab === 'register' && !name.trim()) {
-      setError('Cuéntanos tu nombre para tu tarjeta fiel. 😊');
+    if (!username.trim() || !password) {
+      setError('Completa tu usuario y contraseña.');
       return;
     }
     setLoading(true);
-    const res = tab === 'login' ? await signIn(email, password) : await signUp(name, email, password);
+    const res = tab === 'login' ? await signIn(username, password) : await signUp(username, password);
     setLoading(false);
     if (!res.ok) {
       setError(res.message);
@@ -72,7 +67,7 @@ export default function AuthModal() {
                 </div>
                 <div>
                   <h2 className="text-lg font-black tracking-tight text-white">Club Moro’s</h2>
-                  <p className="text-xs text-zinc-400">Guarda tus puntos en tu cuenta ⭐</p>
+                  <p className="text-xs text-zinc-400">Entra con tu usuario y clave ⭐</p>
                 </div>
               </div>
               <button
@@ -118,25 +113,15 @@ export default function AuthModal() {
               )}
 
               <form onSubmit={handleSubmit} className="space-y-3">
-                {tab === 'register' && (
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-                    <input
-                      type="text"
-                      placeholder="Tu nombre"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      className={inputCls}
-                    />
-                  </div>
-                )}
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
                   <input
-                    type="email"
-                    placeholder="Correo electrónico"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    type="text"
+                    placeholder="Nombre de usuario (Ej. juanito12)"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    autoCapitalize="none"
+                    autoCorrect="off"
                     className={inputCls}
                   />
                 </div>

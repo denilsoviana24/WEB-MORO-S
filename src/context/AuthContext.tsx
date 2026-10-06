@@ -19,10 +19,12 @@ interface AuthContextType {
   user: User | null;
   profile: Profile | null;
   authLoading: boolean;
-  signUp: (name: string, email: string, password: string) => Promise<{ ok: boolean; message: string }>;
-  signIn: (email: string, password: string) => Promise<{ ok: boolean; message: string }>;
+  signUp: (username: string, password: string) => Promise<{ ok: boolean; message: string }>;
+  signIn: (usernameOrEmail: string, password: string) => Promise<{ ok: boolean; message: string }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  /** Registra el premio reclamado y reinicia los sellos. Solo con sesión y tarjeta completa. */
+  redeemReward: (code: string, title: string, goal: number) => Promise<{ ok: boolean; message: string }>;
   /** Guarda el pedido en Supabase y suma 1 sello. Solo con sesión. */
   saveOrder: (order: OrderData, goal: number) => Promise<{ stamps: number; completed: boolean } | null>;
   /** Suma manual (modo dueño) sobre la cuenta logueada. */
@@ -42,6 +44,27 @@ function notifyStamps() {
   } catch {
     // ignorar
   }
+}
+
+/**
+ * Los clientes entran con USUARIO + CONTRASEÑA.
+ * Supabase exige un email, así que el usuario se convierte en
+ * `usuario@club.moros` de forma transparente (el cliente nunca lo ve).
+ * Si escriben un correo real, se usa tal cual (cuentas con email real).
+ */
+const CLUB_DOMAIN = 'club.moros';
+
+function normalizeUsername(input: string): string {
+  return input.trim().toLowerCase();
+}
+
+function isValidUsername(u: string): boolean {
+  return /^[a-z0-9._-]{3,20}$/.test(u);
+}
+
+function toAuthEmail(input: string): string {
+  const v = normalizeUsername(input);
+  return v.includes('@') ? v : `${v}@${CLUB_DOMAIN}`;
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -101,23 +124,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setProfile(await fetchProfile(user.id));
   }, [user, fetchProfile]);
 
-  const signUp = async (name: string, email: string, password: string) => {
+  const signUp = async (username: string, password: string) => {
     if (!supabase) return { ok: false, message: 'Login no configurado todavía. Pide al dueño activar Supabase.' };
+    const user = normalizeUsername(username);
+    if (!user.includes('@') && !isValidUsername(user)) {
+      return { ok: false, message: 'El usuario debe tener 3-20 caracteres: letras, números, punto o guion.' };
+    }
+    if (password.length < 6) {
+      return { ok: false, message: 'La contraseña debe tener al menos 6 caracteres.' };
+    }
     const { data, error } = await supabase.auth.signUp({
-      email: email.trim(),
+      email: toAuthEmail(username),
       password,
-      options: { data: { name: name.trim() } },
+      options: { data: { name: user } },
     });
     if (error) return { ok: false, message: prettyError(error.message) };
     if (!data.session) {
-      return { ok: true, message: '¡Cuenta creada! Revisa tu correo para confirmarla y luego inicia sesión. 📩' };
+      return { ok: true, message: '¡Cuenta creada! Ahora inicia sesión con tu usuario. 👇' };
     }
     return { ok: true, message: '¡Bienvenido al Club Moro’s! 🎉' };
   };
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (usernameOrEmail: string, password: string) => {
     if (!supabase) return { ok: false, message: 'Login no configurado todavía. Pide al dueño activar Supabase.' };
-    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+    const { error } = await supabase.auth.signInWithPassword({
+      email: toAuthEmail(usernameOrEmail),
+      password,
+    });
     if (error) return { ok: false, message: prettyError(error.message) };
     return { ok: true, message: '¡Qué bueno verte de nuevo! 🍔' };
   };
@@ -194,6 +227,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  /** Reclama el premio: lo registra en Supabase y reinicia la tarjeta. */
+  const redeemReward = async (code: string, title: string, goal: number) => {
+    if (!supabase || !user) {
+      resetLoyaltyStamps();
+      return { ok: true, message: '¡Premio reclamado! Muestra el código en caja. 🎉' };
+    }
+    try {
+      const prof = await fetchProfile(user.id);
+      if (!prof || (prof.stamps ?? 0) < goal) {
+        return { ok: false, message: 'Aún no completas tu tarjeta. ¡Sigue juntando sellos! 🍟' };
+      }
+      const { error: insError } = await supabase.from('redemptions').insert({
+        user_id: user.id,
+        reward_code: code,
+        reward_title: title,
+        stamps_used: goal,
+      });
+      if (insError) throw insError;
+      await supabase.from('profiles').update({ stamps: 0 }).eq('id', user.id);
+      await refreshProfile();
+      notifyStamps();
+      return { ok: true, message: `¡Premio registrado! Muestra el código ${code} en caja. 🎉` };
+    } catch {
+      return { ok: false, message: 'No se pudo registrar el premio. Intenta de nuevo.' };
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -207,6 +267,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         saveOrder,
         addStampCloud,
         resetStampsCloud,
+        redeemReward,
         isAuthModalOpen,
         setAuthModalOpen,
         supabaseReady: isSupabaseConfigured,
@@ -219,10 +280,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 function prettyError(msg: string): string {
   const m = msg.toLowerCase();
-  if (m.includes('invalid login') || m.includes('invalid credentials')) return 'Correo o contraseña incorrectos.';
-  if (m.includes('already registered') || m.includes('already exists')) return 'Ese correo ya tiene cuenta. Inicia sesión. 👇';
+  if (m.includes('invalid login') || m.includes('invalid credentials')) return 'Usuario o contraseña incorrectos.';
+  if (m.includes('already registered') || m.includes('already exists')) return 'Ese usuario ya existe. Inicia sesión. 👇';
   if (m.includes('password')) return 'La contraseña debe tener al menos 6 caracteres.';
-  if (m.includes('email')) return 'Revisa que el correo sea válido.';
+  if (m.includes('email')) return 'Ese usuario no es válido.';
   return 'Ocurrió un error. Intenta de nuevo.';
 }
 
