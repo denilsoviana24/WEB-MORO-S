@@ -2,13 +2,14 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, User, Lock, LogIn, UserPlus, Loader2 } from 'lucide-react';
+import { X, User, Mail, Lock, LogIn, UserPlus, Loader2 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
 export default function AuthModal() {
   const { isAuthModalOpen, setAuthModalOpen, signIn, signUp, supabaseReady } = useAuth();
   const [tab, setTab] = useState<'login' | 'register'>('login');
   const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -29,7 +30,7 @@ export default function AuthModal() {
       return;
     }
     setLoading(true);
-    const res = tab === 'login' ? await signIn(username, password) : await signUp(username, password);
+    const res = tab === 'login' ? await signIn(username, password) : await signUp(username, email, password);
     setLoading(false);
     if (!res.ok) {
       setError(res.message);
@@ -117,7 +118,7 @@ export default function AuthModal() {
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
                   <input
                     type="text"
-                    placeholder="Nombre de usuario (Ej. juanito12)"
+                    placeholder={tab === 'login' ? 'Usuario o correo' : 'Nombre de usuario (Ej. juanito12)'}
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     autoCapitalize="none"
@@ -125,6 +126,20 @@ export default function AuthModal() {
                     className={inputCls}
                   />
                 </div>
+                {tab === 'register' && (
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                    <input
+                      type="email"
+                      placeholder="Tu correo (solo para recuperar tu cuenta)"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      className={inputCls}
+                    />
+                  </div>
+                )}
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
                   <input

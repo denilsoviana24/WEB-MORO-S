@@ -19,7 +19,7 @@ interface AuthContextType {
   user: User | null;
   profile: Profile | null;
   authLoading: boolean;
-  signUp: (username: string, password: string) => Promise<{ ok: boolean; message: string }>;
+  signUp: (username: string, email: string, password: string) => Promise<{ ok: boolean; message: string }>;
   signIn: (usernameOrEmail: string, password: string) => Promise<{ ok: boolean; message: string }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -47,13 +47,9 @@ function notifyStamps() {
 }
 
 /**
- * Los clientes entran con USUARIO + CONTRASEÑA.
- * Supabase exige un email, así que el usuario se convierte en
- * `usuario@club.moros` de forma transparente (el cliente nunca lo ve).
- * Si escriben un correo real, se usa tal cual (cuentas con email real).
+ * Los clientes se registran con USUARIO + CORREO + CONTRASEÑA,
+ * pero entran solo con USUARIO + CONTRASEÑA (vía /api/login).
  */
-const CLUB_DOMAIN = 'club.moros';
-
 function normalizeUsername(input: string): string {
   return input.trim().toLowerCase();
 }
@@ -62,9 +58,8 @@ function isValidUsername(u: string): boolean {
   return /^[a-z0-9._-]{3,20}$/.test(u);
 }
 
-function toAuthEmail(input: string): string {
-  const v = normalizeUsername(input);
-  return v.includes('@') ? v : `${v}@${CLUB_DOMAIN}`;
+function isValidEmail(e: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e.trim());
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -124,35 +119,62 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setProfile(await fetchProfile(user.id));
   }, [user, fetchProfile]);
 
-  const signUp = async (username: string, password: string) => {
+  const signUp = async (username: string, email: string, password: string) => {
     if (!supabase) return { ok: false, message: 'Login no configurado todavía. Pide al dueño activar Supabase.' };
     const user = normalizeUsername(username);
-    if (!user.includes('@') && !isValidUsername(user)) {
+    const mail = email.trim().toLowerCase();
+    if (!isValidUsername(user)) {
       return { ok: false, message: 'El usuario debe tener 3-20 caracteres: letras, números, punto o guion.' };
+    }
+    if (!isValidEmail(mail)) {
+      return { ok: false, message: 'Escribe un correo válido (solo para recuperar tu cuenta).' };
     }
     if (password.length < 6) {
       return { ok: false, message: 'La contraseña debe tener al menos 6 caracteres.' };
     }
+    // ¿Usuario disponible?
+    try {
+      const { data: taken } = await supabase.from('usernames').select('username').eq('username', user).maybeSingle();
+      if (taken) return { ok: false, message: 'Ese usuario ya existe. Elige otro o inicia sesión. 👇' };
+    } catch {
+      // si la vista aún no existe, Supabase lo rechazará de todos modos
+    }
     const { data, error } = await supabase.auth.signUp({
-      email: toAuthEmail(username),
+      email: mail,
       password,
       options: { data: { name: user } },
     });
     if (error) return { ok: false, message: prettyError(error.message) };
     if (!data.session) {
-      return { ok: true, message: '¡Cuenta creada! Ahora inicia sesión con tu usuario. 👇' };
+      return { ok: true, message: '¡Cuenta creada! Revisa tu correo para confirmarla y luego entra con tu usuario. 📩' };
     }
     return { ok: true, message: '¡Bienvenido al Club Moro’s! 🎉' };
   };
 
   const signIn = async (usernameOrEmail: string, password: string) => {
     if (!supabase) return { ok: false, message: 'Login no configurado todavía. Pide al dueño activar Supabase.' };
-    const { error } = await supabase.auth.signInWithPassword({
-      email: toAuthEmail(usernameOrEmail),
-      password,
-    });
-    if (error) return { ok: false, message: prettyError(error.message) };
-    return { ok: true, message: '¡Qué bueno verte de nuevo! 🍔' };
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifier: usernameOrEmail, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (data?.error === 'NEEDS_SERVICE_KEY') {
+          return { ok: false, message: 'Login en mantenimiento. Intenta entrar con tu correo. ✉️' };
+        }
+        return { ok: false, message: 'Usuario o contraseña incorrectos.' };
+      }
+      const { error: sessError } = await supabase.auth.setSession({
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+      });
+      if (sessError) return { ok: false, message: 'No se pudo iniciar sesión. Intenta de nuevo.' };
+      return { ok: true, message: '¡Qué bueno verte de nuevo! 🍔' };
+    } catch {
+      return { ok: false, message: 'Error de conexión. Revisa tu internet.' };
+    }
   };
 
   const signOut = async () => {

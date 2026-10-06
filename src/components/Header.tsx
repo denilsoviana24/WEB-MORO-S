@@ -122,9 +122,7 @@ export default function Header() {
               <div className="absolute right-0 top-full mt-2 w-60 bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl p-4 z-50 space-y-3">
                 <div className="min-w-0">
                   <p className="font-black text-white text-sm truncate">@{profile?.name || 'cliente'}</p>
-                  <p className="text-[11px] text-zinc-500 truncate">
-                    {user.email?.endsWith('@club.moros') ? 'Miembro del Club Moro’s ⭐' : user.email}
-                  </p>
+                  <p className="text-[11px] text-zinc-500 truncate">{user.email}</p>
                 </div>
                 <div className="bg-zinc-950 border border-amber-500/30 rounded-xl px-3 py-2 flex items-center justify-between">
                   <span className="text-[11px] font-bold text-zinc-400">Mis sellos 🍟</span>
