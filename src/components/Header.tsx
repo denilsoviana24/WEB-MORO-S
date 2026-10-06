@@ -105,14 +105,22 @@ export default function Header() {
           <div className="relative">
             <button
               onClick={() => (user ? setAccountOpen((v) => !v) : setAuthModalOpen(true))}
-              className="w-10 h-10 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-orange-500 text-zinc-300 hover:text-white font-black flex items-center justify-center transition-all"
+              className={`h-10 rounded-xl bg-zinc-900 border hover:border-orange-500 font-black flex items-center justify-center transition-all ${
+                user ? 'border-emerald-500/50 px-2.5 gap-2' : 'w-10 border-zinc-800 text-zinc-300 hover:text-white'
+              }`}
               aria-label={user ? 'Mi cuenta' : 'Entrar a mi cuenta'}
-              title={user ? 'Mi cuenta' : 'Entrar / Crear cuenta'}
+              title={user ? `Ingresado como @${profile?.name || ''}` : 'Entrar / Crear cuenta'}
             >
               {user ? (
-                <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-400 to-orange-600 text-zinc-950 text-sm flex items-center justify-center">
-                  {((profile?.name || user.email || 'M')[0] || 'M').toUpperCase()}
-                </span>
+                <>
+                  <span className="relative w-7 h-7 shrink-0 rounded-lg bg-gradient-to-br from-amber-400 to-orange-600 text-zinc-950 text-sm flex items-center justify-center">
+                    {((profile?.name || user.email || 'M')[0] || 'M').toUpperCase()}
+                    <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-zinc-900" />
+                  </span>
+                  <span className="text-xs font-black text-white max-w-[110px] truncate">
+                    @{(profile?.name || (user.email || '').split('@')[0] || 'cliente').toLowerCase()}
+                  </span>
+                </>
               ) : (
                 <User className="w-5 h-5" />
               )}
