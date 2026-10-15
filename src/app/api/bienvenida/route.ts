@@ -20,7 +20,7 @@ export async function POST(req: Request) {
   }
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://web-moro-s-brhw.vercel.app';
-  const results: Record<string, boolean> = { email: false, newsletter: false };
+  const results: Record<string, boolean> = { email: false, newsletter: false, resendContact: false };
 
   // 1) Suscribir al newsletter de Mailchimp (no bloquea si no está configurado)
   const mcKey = process.env.MAILCHIMP_API_KEY;
@@ -46,6 +46,25 @@ export async function POST(req: Request) {
       );
       const data = await res.json().catch(() => ({}));
       results.newsletter = res.ok || data?.title === 'Member Exists';
+    } catch {
+      // ignorar
+    }
+  }
+
+  // 1b) Agregar a la audiencia de Resend (para usar Broadcasts)
+  const resendKeyEarly = process.env.RESEND_API_KEY;
+  const resendAudience = process.env.RESEND_AUDIENCE_ID;
+  if (resendKeyEarly && resendAudience) {
+    try {
+      const res = await fetch(`https://api.resend.com/audiences/${resendAudience}/contacts`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${resendKeyEarly}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, first_name: name.slice(0, 50), unsubscribed: false }),
+      });
+      results.resendContact = res.ok || res.status === 409;
     } catch {
       // ignorar
     }

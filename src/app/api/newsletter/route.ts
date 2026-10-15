@@ -31,6 +31,24 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'INVALID_EMAIL' }, { status: 400 });
   }
 
+  // También agregar a la audiencia de Resend (para Broadcasts), sin bloquear
+  const resendKey = process.env.RESEND_API_KEY;
+  const resendAudience = process.env.RESEND_AUDIENCE_ID;
+  if (resendKey && resendAudience) {
+    try {
+      await fetch(`https://api.resend.com/audiences/${resendAudience}/contacts`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${resendKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, first_name: name.slice(0, 50), unsubscribed: false }),
+      }).catch(() => {});
+    } catch {
+      // ignorar
+    }
+  }
+
   try {
     const res = await fetch(
       `https://${server}.api.mailchimp.com/3.0/lists/${audienceId}/members`,
