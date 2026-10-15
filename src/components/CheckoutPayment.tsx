@@ -155,6 +155,26 @@ export default function CheckoutPayment({
     };
     openWhatsApp(buildMessage(extra));
     onOrderComplete(order);
+    // Aviso por correo al dueño (no bloquea ni rompe el flujo si falla)
+    try {
+      fetch('/api/pedido-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          number: order.number,
+          customerName: order.customerName,
+          customerPhone: order.customerPhone,
+          deliveryType: order.deliveryType,
+          deliveryAddress: order.deliveryAddress,
+          paymentMethod: order.paymentMethod,
+          items: order.items,
+          notes: order.notes,
+          total: order.total,
+        }),
+      }).catch(() => {});
+    } catch {
+      // ignorar: el pedido ya salió por WhatsApp
+    }
   };
 
   const copyField = async (key: string, value: string) => {
