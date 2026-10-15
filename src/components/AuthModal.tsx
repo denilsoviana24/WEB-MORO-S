@@ -120,9 +120,10 @@ export default function AuthModal() {
                     type="text"
                     placeholder={tab === 'login' ? 'Usuario o correo' : 'Nombre de usuario (Ej. juanito12)'}
                     value={username}
-                    onChange={(e) => setUsername(e.target.value)}
+                    onChange={(e) => setUsername(e.target.value.replace(/\s/g, ''))}
                     autoCapitalize="none"
                     autoCorrect="off"
+                    spellCheck={false}
                     className={inputCls}
                   />
                 </div>
@@ -133,9 +134,11 @@ export default function AuthModal() {
                       type="email"
                       placeholder="Tu correo (solo para recuperar tu cuenta)"
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      onChange={(e) => setEmail(e.target.value.replace(/\s/g, ''))}
                       autoCapitalize="none"
                       autoCorrect="off"
+                      spellCheck={false}
+                      inputMode="email"
                       className={inputCls}
                     />
                   </div>
