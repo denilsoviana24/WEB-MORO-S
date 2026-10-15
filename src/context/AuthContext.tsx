@@ -145,6 +145,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       options: { data: { name: user } },
     });
     if (error) return { ok: false, message: prettyError(error.message) };
+    // Bienvenida: correo con ofertas + suscripción al newsletter (no bloquea)
+    try {
+      fetch('/api/bienvenida', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: mail, name: user }),
+      }).catch(() => {});
+    } catch {
+      // ignorar
+    }
     if (!data.session) {
       return { ok: true, message: '¡Cuenta creada! Revisa tu correo para confirmarla y luego entra con tu usuario. 📩' };
     }
