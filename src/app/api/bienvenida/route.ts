@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { varietyGridHtml } from '@/lib/emails';
 
 /**
  * POST /api/bienvenida
@@ -82,7 +83,9 @@ export async function POST(req: Request) {
         <p style="margin:8px 0;font-size:28px;letter-spacing:4px;"><strong>MOROS10</strong></p>
         <p style="margin:0;color:#d4d4d8;font-size:13px;">10% OFF en tu pedido mayor a $5. Menciónalo en caja o por WhatsApp.</p>
       </div>
-      <h3 style="color:#fbbf24;">⭐ Lo que te espera:</h3>
+      <h3 style="color:#fbbf24;">🍔 Empieza por lo más pedido</h3>
+      ${varietyGridHtml(4)}
+      <h3 style="color:#fbbf24;margin-top:20px;">⭐ Lo que te espera:</h3>
       <ul style="color:#d4d4d8;line-height:1.9;font-size:14px;">
         <li>🍟 1 sello por cada pedido → con 20 te regalamos una <strong>Papi Completa</strong></li>
         <li>🥉 Bronce: Salchipapa gratis · 🥈 Plata: Bebida grande gratis · 🥇 Oro: Picaditas gratis</li>
