@@ -6,6 +6,7 @@ import AnatomySection from '@/components/AnatomySection';
 import AboutSection from '@/components/AboutSection';
 import ReviewsSection from '@/components/ReviewsSection';
 import LoyaltySection from '@/components/LoyaltySection';
+import NewsletterSection from '@/components/NewsletterSection';
 import LocationContact from '@/components/LocationContact';
 
 export default function Home() {
@@ -26,6 +27,7 @@ export default function Home() {
       <AboutSection />
       <ReviewsSection />
       <LoyaltySection />
+      <NewsletterSection />
       <LocationContact />
     </>
   );
