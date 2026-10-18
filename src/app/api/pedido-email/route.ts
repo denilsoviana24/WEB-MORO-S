@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server';
 import { RESTAURANT_INFO } from '@/data/menuData';
+import { mailProvider, ordersEmail, sendEmail } from '@/lib/mailer';
 
 /**
  * POST /api/pedido-email
- * Envía el aviso de un pedido nuevo al correo del dueño vía Resend.
+ * Envía el aviso de un pedido nuevo al correo del dueño.
  *
- * Requiere en Vercel / .env.local (SOLO servidor):
- *   RESEND_API_KEY=...   (https://resend.com → API Keys, plan gratis)
- *   ORDERS_EMAIL=...     (correo donde recibes los pedidos; debe ser
- *                         el de tu cuenta Resend si no verificas dominio)
+ * Proveedor principal: Gmail SMTP (GMAIL_USER + GMAIL_APP_PASSWORD).
+ * Respaldo: Resend (RESEND_API_KEY).
+ * Destino: ORDERS_EMAIL (o GMAIL_USER si no se define).
  */
 interface OrderItem {
   name: string;
@@ -37,10 +37,9 @@ function esc(s: string): string {
 }
 
 export async function POST(req: Request) {
-  const apiKey = process.env.RESEND_API_KEY;
-  const to = process.env.ORDERS_EMAIL || RESTAURANT_INFO.email;
+  const to = ordersEmail() || RESTAURANT_INFO.email;
 
-  if (!apiKey) {
+  if (mailProvider() === 'none') {
     return NextResponse.json({ error: 'NOT_CONFIGURED' }, { status: 501 });
   }
 
@@ -85,27 +84,15 @@ export async function POST(req: Request) {
     <p style="color:#999;font-size:12px;">Enviado automáticamente desde la web de Moro's.</p>
   </div>`;
 
-  try {
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: "Moro's Web <onboarding@resend.dev>",
-        to: [to],
-        subject: `🍔 Nuevo pedido ${body.number || ''} — $${Number(body.total).toFixed(2)}`,
-        html,
-      }),
-    });
-    if (!res.ok) {
-      console.error('Resend error:', (await res.text()).slice(0, 300));
-      return NextResponse.json({ error: 'GATEWAY_ERROR' }, { status: 502 });
-    }
-    return NextResponse.json({ sent: true });
-  } catch (err) {
-    console.error('Error enviando correo de pedido:', err);
+  const sent = await sendEmail({
+    to,
+    subject: `🍔 Nuevo pedido ${body.number || ''} — $${Number(body.total).toFixed(2)}`,
+    html,
+    fromName: "Moro's Web",
+  });
+
+  if (!sent) {
     return NextResponse.json({ error: 'GATEWAY_ERROR' }, { status: 502 });
   }
+  return NextResponse.json({ sent: true, provider: mailProvider() });
 }

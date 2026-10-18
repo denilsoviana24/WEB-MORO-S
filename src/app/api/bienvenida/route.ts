@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server';
 import { varietyGridHtml } from '@/lib/emails';
+import { sendEmail } from '@/lib/mailer';
 
 /**
  * POST /api/bienvenida
- * Al crear una cuenta: envía correo de bienvenida con ofertas (Resend)
- * y suscribe al cliente al newsletter (Mailchimp). Todo tolerante a fallos.
+ * Al crear una cuenta: envía correo de bienvenida con ofertas (Gmail SMTP,
+ * respaldo Resend) y suscribe al cliente al newsletter (Mailchimp + Resend).
+ * Todo tolerante a fallos.
  */
 export async function POST(req: Request) {
   let body: { email?: string; name?: string };
@@ -71,10 +73,8 @@ export async function POST(req: Request) {
     }
   }
 
-  // 2) Correo de bienvenida con ofertas vía Resend
-  const resendKey = process.env.RESEND_API_KEY;
-  if (resendKey) {
-    const html = `
+  // 2) Correo de bienvenida con ofertas (Gmail SMTP, respaldo Resend)
+  const html = `
     <div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;background:#0f0a06;color:#fafafa;padding:32px 24px;border-radius:16px;">
       <h1 style="margin:0;">🍔 ¡Bienvenido al Club Moro's, ${name}!</h1>
       <p style="color:#d4d4d8;">Tu cuenta está lista. Guarda sellos con cada pedido y recibe nuestras promos.</p>
@@ -98,26 +98,12 @@ export async function POST(req: Request) {
       </div>
       <p style="color:#71717a;font-size:12px;text-align:center;">Av. Veintimilla y Pasaje Atahualpa, Tulcán · Lun-Dom 17:00–23:00<br>¡Buen provecho! 🔥</p>
     </div>`;
-    try {
-      const res = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${resendKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          from: "Moro's Club <onboarding@resend.dev>",
-          to: [email],
-          subject: `🎉 Bienvenido al Club Moro's, ${name} — tienes un cupón`,
-          html,
-        }),
-      });
-      results.email = res.ok;
-      if (!res.ok) console.error('Resend bienvenida:', (await res.text()).slice(0, 200));
-    } catch (err) {
-      console.error('Error correo bienvenida:', err);
-    }
-  }
+  results.email = await sendEmail({
+    to: email,
+    subject: `🎉 Bienvenido al Club Moro's, ${name} — tienes un cupón`,
+    html,
+    fromName: "Moro's Club",
+  });
 
   return NextResponse.json(results);
 }

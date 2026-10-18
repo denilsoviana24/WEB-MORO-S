@@ -1,4 +1,5 @@
 import { getPopular, PROMOTIONS } from '@/data/assistantData';
+import { sendEmail } from '@/lib/mailer';
 
 export function siteUrl(): string {
   return process.env.NEXT_PUBLIC_SITE_URL || 'https://web-moro-s-brhw.vercel.app';
@@ -51,9 +52,6 @@ export async function sendVarietyEmail(
   name: string,
   reason: 'welcome' | 'comeback' = 'comeback'
 ): Promise<boolean> {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) return false;
-
   const firstName = (name || 'amigo').split(' ')[0];
   const subject =
     reason === 'welcome'
@@ -73,19 +71,10 @@ export async function sendVarietyEmail(
     <p style="color:#71717a;font-size:12px;text-align:center;">Av. Veintimilla y Pasaje Atahualpa, Tulcán · Lun-Dom 17:00–23:00</p>
   </div>`;
 
-  try {
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        from: "Moro's Club <onboarding@resend.dev>",
-        to: [to],
-        subject,
-        html,
-      }),
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
+  return sendEmail({
+    to,
+    subject,
+    html,
+    fromName: "Moro's Club",
+  });
 }
