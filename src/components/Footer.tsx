@@ -5,8 +5,10 @@ import Link from 'next/link';
 import { MapPin, Phone, Mail, Clock, MessageCircle, Heart } from 'lucide-react';
 import { RESTAURANT_INFO } from '@/data/menuData';
 import Logo from '@/components/Logo';
+import { useAuth } from '@/context/AuthContext';
 
 export default function Footer() {
+  const { isAdmin } = useAuth();
   return (
     <footer className="bg-zinc-950 border-t border-zinc-900 text-zinc-400 pt-16 pb-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -126,10 +128,14 @@ export default function Footer() {
             <span>Creado con</span>
             <Heart className="w-3.5 h-3.5 text-red-500 fill-red-500" />
             <span>para Moro&apos;s</span>
-            <span className="text-zinc-700">·</span>
-            <a href="/admin" className="hover:text-amber-400 transition-colors">
-              Administración
-            </a>
+            {isAdmin && (
+              <>
+                <span className="text-zinc-700">·</span>
+                <Link href="/admin" className="hover:text-amber-400 transition-colors font-semibold">
+                  Administración
+                </Link>
+              </>
+            )}
           </p>
         </div>
       </div>

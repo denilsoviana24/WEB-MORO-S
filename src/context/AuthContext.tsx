@@ -13,11 +13,15 @@ export interface Profile {
   stamps: number;
   total_orders: number;
   total_spent: number;
+  /** Solo el dueño lo tiene en true (columna profiles.is_admin). */
+  is_admin?: boolean;
 }
 
 interface AuthContextType {
   user: User | null;
   profile: Profile | null;
+  /** true solo para la cuenta del dueño. El servidor vuelve a comprobarlo en cada API. */
+  isAdmin: boolean;
   authLoading: boolean;
   signUp: (username: string, email: string, password: string) => Promise<{ ok: boolean; message: string }>;
   signIn: (usernameOrEmail: string, password: string) => Promise<{ ok: boolean; message: string }>;
@@ -291,6 +295,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       value={{
         user,
         profile,
+        isAdmin: profile?.is_admin === true,
         authLoading,
         signUp,
         signIn,

@@ -19,7 +19,7 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
 ];
 
 export default function AdminPage() {
-  const { user, profile, authLoading, setAuthModalOpen } = useAuth();
+  const { user, profile, authLoading, isAdmin, setAuthModalOpen, signOut } = useAuth();
   const [tab, setTab] = useState<Tab>('resumen');
 
   if (authLoading) {
@@ -44,6 +44,38 @@ export default function AdminPage() {
             className="mt-5 w-full flex items-center justify-center gap-2 bg-gradient-to-r from-orange-600 to-amber-500 text-zinc-950 font-black py-3 rounded-2xl text-sm"
           >
             <LogIn className="w-4 h-4" /> Iniciar sesión
+          </button>
+          <Link href="/" className="inline-flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 mt-4">
+            <ArrowLeft className="w-3.5 h-3.5" /> Volver a la web
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center">
+        <p className="text-sm text-zinc-400">Verificando permisos…</p>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center px-4">
+        <div className="max-w-md w-full bg-zinc-900/80 border border-zinc-800 rounded-3xl p-8 text-center">
+          <ShieldAlert className="w-10 h-10 text-red-400 mx-auto mb-4" />
+          <h1 className="text-xl font-black text-white">Acceso restringido</h1>
+          <p className="text-xs text-zinc-400 mt-2">
+            Esta sección es solo para el administrador de la página. La cuenta{' '}
+            <strong className="text-zinc-200">{user.email}</strong> no tiene permisos.
+          </p>
+          <button
+            onClick={signOut}
+            className="mt-5 w-full flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-black py-3 rounded-2xl text-sm"
+          >
+            <LogIn className="w-4 h-4 rotate-180" /> Cambiar de cuenta
           </button>
           <Link href="/" className="inline-flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 mt-4">
             <ArrowLeft className="w-3.5 h-3.5" /> Volver a la web

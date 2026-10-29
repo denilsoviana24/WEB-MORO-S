@@ -13,6 +13,7 @@ import BurgerCursor from '@/components/BurgerCursor';
 import FlyToCart from '@/components/FlyToCart';
 import ReserveButton from '@/components/ReserveButton';
 import AiAssistant from '@/components/AiAssistant';
+import AdminShortcut from '@/components/AdminShortcut';
 
 const outfit = Outfit({
   subsets: ['latin'],
@@ -67,6 +68,7 @@ export default function RootLayout({
             <ReserveButton />
             <AiAssistant />
             <AuthModal />
+            <AdminShortcut />
           </div>
           </ProductsProvider>
           </AuthProvider>
