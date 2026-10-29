@@ -69,6 +69,7 @@ function isValidEmail(e: string): boolean {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [serverAdmin, setServerAdmin] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
   const [isAuthModalOpen, setAuthModalOpen] = useState(false);
 
@@ -122,6 +123,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!supabase || !user) return;
     setProfile(await fetchProfile(user.id));
   }, [user, fetchProfile]);
+
+  /** El servidor decide quién es administrador (más fiable que solo el perfil). */
+  useEffect(() => {
+    let alive = true;
+    if (!user || !supabase) {
+      setServerAdmin(false);
+      return;
+    }
+    (async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const token = data.session?.access_token;
+        if (!token) return;
+        const res = await fetch('/api/admin/me', {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: 'no-store',
+        });
+        const json = await res.json().catch(() => ({}));
+        if (alive) setServerAdmin(json?.admin === true);
+      } catch {
+        // sin conexión: se queda como estaba
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [user]);
 
   const signUp = async (username: string, email: string, password: string) => {
     if (!supabase) return { ok: false, message: 'Login no configurado todavía. Pide al dueño activar Supabase.' };
@@ -295,7 +323,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       value={{
         user,
         profile,
-        isAdmin: profile?.is_admin === true,
+        isAdmin: profile?.is_admin === true || serverAdmin,
         authLoading,
         signUp,
         signIn,

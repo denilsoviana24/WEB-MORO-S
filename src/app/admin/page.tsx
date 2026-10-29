@@ -53,7 +53,7 @@ export default function AdminPage() {
     );
   }
 
-  if (!profile) {
+  if (!isAdmin && !profile) {
     return (
       <div className="min-h-[70vh] flex items-center justify-center">
         <p className="text-sm text-zinc-400">Verificando permisos…</p>
