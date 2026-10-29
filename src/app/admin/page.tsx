@@ -2,20 +2,24 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { LayoutDashboard, Package, ShoppingBag, Ticket, LogIn, ShieldAlert, ArrowLeft } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingBag, Ticket, Users, Inbox, LogIn, ShieldAlert, ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import StatsPanel from '@/components/admin/StatsPanel';
 import ProductsPanel from '@/components/admin/ProductsPanel';
 import OrdersPanel from '@/components/admin/OrdersPanel';
 import CouponsPanel from '@/components/admin/CouponsPanel';
+import CustomersPanel from '@/components/admin/CustomersPanel';
+import MessagesPanel from '@/components/admin/MessagesPanel';
 
-type Tab = 'resumen' | 'productos' | 'pedidos' | 'cupones';
+type Tab = 'resumen' | 'productos' | 'pedidos' | 'cupones' | 'clientes' | 'mensajes';
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'resumen', label: 'Resumen', icon: <LayoutDashboard className="w-4 h-4" /> },
   { id: 'productos', label: 'Productos', icon: <Package className="w-4 h-4" /> },
   { id: 'pedidos', label: 'Pedidos', icon: <ShoppingBag className="w-4 h-4" /> },
   { id: 'cupones', label: 'Cupones', icon: <Ticket className="w-4 h-4" /> },
+  { id: 'clientes', label: 'Clientes', icon: <Users className="w-4 h-4" /> },
+  { id: 'mensajes', label: 'Mensajes', icon: <Inbox className="w-4 h-4" /> },
 ];
 
 export default function AdminPage() {
@@ -125,6 +129,8 @@ export default function AdminPage() {
         {tab === 'productos' && <ProductsPanel />}
         {tab === 'pedidos' && <OrdersPanel />}
         {tab === 'cupones' && <CouponsPanel />}
+        {tab === 'clientes' && <CustomersPanel />}
+        {tab === 'mensajes' && <MessagesPanel />}
       </div>
 
       <p className="text-[11px] text-zinc-600 text-center mt-6">
