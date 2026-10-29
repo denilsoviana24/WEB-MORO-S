@@ -27,6 +27,8 @@ interface Body {
   items?: OrderItem[];
   notes?: string;
   total?: number;
+  couponCode?: string;
+  discount?: number;
 }
 
 function esc(s: string): string {
@@ -78,6 +80,8 @@ export async function POST(req: Request) {
     <h3 style="margin:16px 0 8px;">Detalle</h3>
     <table style="width:100%;background:#fff;border-radius:8px;padding:8px 16px;border-collapse:collapse;">
       ${itemsHtml}
+      ${Number(body.discount) > 0 ? `<tr><td style="padding:8px;border-bottom:1px solid #eee;">Subtotal</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:right;">$${Number(body.total).toFixed(2)}</td></tr>
+      <tr><td style="padding:8px;border-bottom:1px solid #eee;color:#059669;">Cupón ${esc(body.couponCode || '')}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:right;color:#059669;">-$${Number(body.discount).toFixed(2)}</td></tr>` : ''}
       <tr><td style="padding:12px 8px 8px;"><strong>TOTAL</strong></td><td style="padding:12px 8px 8px;text-align:right;font-size:20px;"><strong>$${Number(body.total).toFixed(2)}</strong></td></tr>
     </table>
     ${body.notes ? `<p style="color:#666;"><em>Notas: ${esc(body.notes)}</em></p>` : ''}

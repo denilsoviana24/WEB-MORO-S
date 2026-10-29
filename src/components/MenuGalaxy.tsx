@@ -2,7 +2,8 @@
 
 import React, { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CATEGORIES, MENU_ITEMS, MenuItem } from '@/data/menuData';
+import { CATEGORIES, MenuItem } from '@/data/menuData';
+import { useProducts } from '@/context/ProductsContext';
 
 type Props = {
   openId: string | null;
@@ -11,6 +12,7 @@ type Props = {
 };
 
 export default function MenuGalaxy({ openId, onSelect, onOpenProduct }: Props) {
+  const { products } = useProducts();
   const [revealed, setRevealed] = useState(false);
   const [expandAll, setExpandAll] = useState(false);
   const [hoverId, setHoverId] = useState<string | null>(null);
@@ -20,10 +22,10 @@ export default function MenuGalaxy({ openId, onSelect, onOpenProduct }: Props) {
       CATEGORIES.filter((c) => c.id !== 'todos')
         .map((cat) => ({
           cat,
-          items: MENU_ITEMS.filter((m) => m.category === cat.id),
+          items: products.filter((m) => m.category === cat.id),
         }))
         .filter((g) => g.items.length > 0),
-    []
+    [products]
   );
 
   const n = groups.length;

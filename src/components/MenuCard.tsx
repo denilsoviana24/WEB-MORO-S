@@ -16,6 +16,9 @@ export default function MenuCard({ item, onOpenModal }: MenuCardProps) {
   const { addToCart, cart } = useCart();
   const [addedAnimation, setAddedAnimation] = React.useState(false);
   const [imgSrc, setImgSrc] = React.useState(item.image);
+  const originalPrice = (item as MenuItem & { originalPrice?: number }).originalPrice;
+  const stock = (item as MenuItem & { stock?: number | null }).stock;
+  const outOfStock = stock !== null && stock !== undefined && stock <= 0;
 
   // Check how many of this item is currently in cart
   const cartCount = cart
@@ -24,6 +27,7 @@ export default function MenuCard({ item, onOpenModal }: MenuCardProps) {
 
   const handleQuickAdd = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (outOfStock) return;
     flyToCartFromEvent(e, imgSrc);
     addToCart(item);
     setAddedAnimation(true);
@@ -94,17 +98,27 @@ export default function MenuCard({ item, onOpenModal }: MenuCardProps) {
           <span className="text-lg sm:text-xl font-black text-amber-400 tracking-tight">
             ${item.price.toFixed(2)}
           </span>
+          {originalPrice && originalPrice > item.price && (
+            <span className="text-[11px] text-zinc-500 line-through ml-1.5">
+              ${originalPrice.toFixed(2)}
+            </span>
+          )}
         </div>
 
         <button
           onClick={handleQuickAdd}
+          disabled={outOfStock}
           className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-black transition-all ${
-            addedAnimation
+            outOfStock
+              ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
+              : addedAnimation
               ? 'bg-emerald-500 text-zinc-950 scale-105'
               : 'bg-gradient-to-r from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-400 text-zinc-950 shadow-md active:scale-95'
           }`}
         >
-          {addedAnimation ? (
+          {outOfStock ? (
+            <span>Agotado</span>
+          ) : addedAnimation ? (
             <>
               <Check className="w-4 h-4" />
               <span>¡Agregado!</span>

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { X, Plus, Minus, Trash2, ShoppingBag, ArrowRight, MapPin, Store, User, Phone, FileText } from 'lucide-react';
+import { X, Plus, Minus, Trash2, ShoppingBag, ArrowRight, MapPin, Store, User, Phone, FileText, Tag, CheckCircle2 } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { RESTAURANT_INFO } from '@/data/menuData';
 import CheckoutPayment from '@/components/CheckoutPayment';
@@ -21,24 +21,71 @@ export default function CartDrawer() {
   const [orderNotes, setOrderNotes] = useState('');
   const [step, setStep] = useState<'cart' | 'pay'>('cart');
   const [ticket, setTicket] = useState<OrderData | null>(null);
+  // Cupones
+  const [couponInput, setCouponInput] = useState('');
+  const [couponCode, setCouponCode] = useState<string | null>(null);
+  const [discount, setDiscount] = useState(0);
+  const [couponMsg, setCouponMsg] = useState('');
+  const [couponLoading, setCouponLoading] = useState(false);
+
+  const total = Math.max(0, Math.round((subtotal - discount) * 100) / 100);
+
+  const applyCoupon = async () => {
+    const code = couponInput.trim();
+    if (!code) return;
+    setCouponLoading(true);
+    setCouponMsg('');
+    try {
+      const res = await fetch('/api/coupons/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, subtotal }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        setDiscount(0);
+        setCouponCode(null);
+        setCouponMsg(data?.error || 'Cupón no válido.');
+        return;
+      }
+      setDiscount(Number(data.discount) || 0);
+      setCouponCode(data.code);
+      setCouponMsg(`¡Cupón aplicado! ${data.label}`);
+    } catch {
+      setCouponMsg('No se pudo validar el cupón. Intenta de nuevo.');
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  const removeCoupon = () => {
+    setCouponCode(null);
+    setDiscount(0);
+    setCouponInput('');
+    setCouponMsg('');
+  };
 
   // Al abrir el carrito, siempre empezar en el paso del pedido
   useEffect(() => {
     if (isCartOpen) setStep('cart');
   }, [isCartOpen]);
 
-  // Pedido completado: con sesión se guarda en Supabase + 1 sello; invitado = sello local
-  const { user, saveOrder } = useAuth();
-  const handleOrderComplete = async (order: OrderData) => {
+  // Pedido completado: la tienda ya lo guardó en Supabase + sello; aquí solo refrescamos
+  const { user, refreshProfile } = useAuth();
+  const handleOrderComplete = async (
+    order: OrderData,
+    result?: { stamps?: number | null; completed?: boolean }
+  ) => {
     if (user) {
-      const r = await saveOrder(order, STAMPS_GOAL);
-      if (r?.completed) friesRain();
+      await refreshProfile();
+      if (result?.completed) friesRain();
     } else {
       const { completed } = addLoyaltyStamp(STAMPS_GOAL);
       if (completed) friesRain();
     }
     setTicket(order);
     clearCart();
+    removeCoupon();
     setIsCartOpen(false);
   };
 
@@ -104,6 +151,8 @@ export default function CartDrawer() {
               <CheckoutPayment
                 cart={cart}
                 subtotal={subtotal}
+                discount={discount}
+                couponCode={couponCode}
                 deliveryType={deliveryType}
                 customerName={customerName}
                 customerPhone={customerPhone}
@@ -201,6 +250,50 @@ export default function CartDrawer() {
                       </div>
                     );
                   })}
+                </div>
+
+                {/* Cupón de descuento */}
+                <div className="pt-4 border-t border-zinc-900 space-y-2">
+                  <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider block">
+                    Cupón de descuento:
+                  </label>
+                  {couponCode ? (
+                    <div className="flex items-center justify-between bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-3 py-2">
+                      <span className="flex items-center gap-2 text-xs font-bold text-emerald-400">
+                        <CheckCircle2 className="w-4 h-4" />
+                        {couponCode} · -${discount.toFixed(2)}
+                      </span>
+                      <button onClick={removeCoupon} className="text-[11px] text-zinc-400 hover:text-red-400 font-bold">
+                        Quitar
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Tag className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                        <input
+                          type="text"
+                          placeholder="Ej. MOROS10"
+                          value={couponInput}
+                          onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                          onKeyDown={(e) => e.key === 'Enter' && applyCoupon()}
+                          className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-orange-500 uppercase tracking-wider"
+                        />
+                      </div>
+                      <button
+                        onClick={applyCoupon}
+                        disabled={couponLoading || !couponInput.trim()}
+                        className="bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-white font-black px-4 rounded-xl text-xs transition-colors"
+                      >
+                        {couponLoading ? '...' : 'Aplicar'}
+                      </button>
+                    </div>
+                  )}
+                  {couponMsg && (
+                    <p className={`text-[11px] font-semibold ${couponCode ? 'text-emerald-400' : 'text-amber-400'}`}>
+                      {couponMsg}
+                    </p>
+                  )}
                 </div>
 
                 {/* Delivery Type Selector */}
@@ -306,6 +399,12 @@ export default function CartDrawer() {
                   <span>Subtotal:</span>
                   <span className="font-bold text-white">${subtotal.toFixed(2)}</span>
                 </div>
+                {discount > 0 && (
+                  <div className="flex justify-between text-emerald-400 font-bold">
+                    <span>Cupón {couponCode}:</span>
+                    <span>-${discount.toFixed(2)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-zinc-400">
                   <span>Costo de envío:</span>
                   <span className="text-emerald-400 font-bold">
@@ -314,7 +413,7 @@ export default function CartDrawer() {
                 </div>
                 <div className="flex justify-between text-base font-black text-white pt-2 border-t border-zinc-800">
                   <span>Total estimado:</span>
-                  <span className="text-amber-400">${subtotal.toFixed(2)}</span>
+                  <span className="text-amber-400">${total.toFixed(2)}</span>
                 </div>
               </div>
 

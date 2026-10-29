@@ -3,6 +3,7 @@ import { Outfit } from 'next/font/google';
 import './globals.css';
 import { CartProvider } from '@/context/CartContext';
 import { AuthProvider } from '@/context/AuthContext';
+import { ProductsProvider } from '@/context/ProductsContext';
 import AuthModal from '@/components/AuthModal';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
@@ -54,6 +55,7 @@ export default function RootLayout({
       <body className="bg-zinc-950 text-zinc-100 antialiased font-sans selection:bg-orange-500 selection:text-zinc-950">
         <CartProvider>
           <AuthProvider>
+          <ProductsProvider>
           <Intro />
           <BurgerCursor />
           <FlyToCart />
@@ -66,6 +68,7 @@ export default function RootLayout({
             <AiAssistant />
             <AuthModal />
           </div>
+          </ProductsProvider>
           </AuthProvider>
         </CartProvider>
       </body>

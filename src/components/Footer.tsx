@@ -122,10 +122,14 @@ export default function Footer() {
           <p>
             © {new Date().getFullYear()} Moro&apos;s Comidas Rápidas - Tulcán, Ecuador. Todos los derechos reservados.
           </p>
-          <p className="flex items-center gap-1">
+          <p className="flex items-center gap-2">
             <span>Creado con</span>
             <Heart className="w-3.5 h-3.5 text-red-500 fill-red-500" />
             <span>para Moro&apos;s</span>
+            <span className="text-zinc-700">·</span>
+            <a href="/admin" className="hover:text-amber-400 transition-colors">
+              Administración
+            </a>
           </p>
         </div>
       </div>

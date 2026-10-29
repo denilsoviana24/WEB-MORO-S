@@ -12,6 +12,7 @@ import {
   CreditCard,
 } from 'lucide-react';
 import type { CartItem } from '@/context/CartContext';
+import { supabase as supabaseClient } from '@/lib/supabaseClient';
 import { RESTAURANT_INFO } from '@/data/menuData';
 import { createOrderNumber, type OrderData } from '@/components/OrderTicket';
 import {
@@ -29,13 +30,18 @@ import {
 interface CheckoutPaymentProps {
   cart: CartItem[];
   subtotal: number;
+  discount?: number;
+  couponCode?: string | null;
   deliveryType: 'pickup' | 'delivery';
   customerName: string;
   customerPhone: string;
   deliveryAddress: string;
   orderNotes: string;
   onBack: () => void;
-  onOrderComplete: (order: OrderData) => void;
+  onOrderComplete: (
+    order: OrderData,
+    result?: { stamps?: number | null; completed?: boolean }
+  ) => void;
 }
 
 const METHOD_LABEL: Record<PaymentMethodId, string> = {
@@ -82,6 +88,8 @@ function getKushki(publicId: string): KushkiInstance | null {
 export default function CheckoutPayment({
   cart,
   subtotal,
+  discount = 0,
+  couponCode = null,
   deliveryType,
   customerName,
   customerPhone,
@@ -102,6 +110,9 @@ export default function CheckoutPayment({
   const [cardCvc, setCardCvc] = useState('');
   const [qrOk, setQrOk] = useState(true);
 
+  const discountValue = Math.max(0, Number(discount) || 0);
+  const totalToPay = Math.max(0, Math.round((subtotal - discountValue) * 100) / 100);
+
   const buildMessage = (extra?: string) => {
     let message = `*🍔 NUEVO PEDIDO - MORO'S COMIDAS RÁPIDAS*\n`;
     message += `-----------------------------------------\n`;
@@ -119,7 +130,11 @@ export default function CheckoutPayment({
     });
     if (orderNotes) message += `\n*Notas Generales:* ${orderNotes}\n`;
     message += `-----------------------------------------\n`;
-    message += `*TOTAL A PAGAR:* $${subtotal.toFixed(2)}\n`;
+    if (discountValue > 0) {
+      message += `*Subtotal:* $${subtotal.toFixed(2)}\n`;
+      message += `*Cupón ${couponCode || ''}:* -$${discountValue.toFixed(2)}\n`;
+    }
+    message += `*TOTAL A PAGAR:* $${totalToPay.toFixed(2)}\n`;
     message += `-----------------------------------------\n`;
     if (extra) message += `${extra}\n`;
     message += `¡Gracias por preferir Moro's! Quedo a la espera de su confirmación.`;
@@ -134,27 +149,92 @@ export default function CheckoutPayment({
     );
   };
 
-  // Arma el pedido, lo envía por WhatsApp y genera el comprobante
-  const completeOrder = (extra?: string) => {
+  // Arma el pedido, lo registra en la tienda, lo envía por WhatsApp y genera el comprobante
+  const completeOrder = async (extra?: string) => {
+    setPayError('');
+    const draftNumber = createOrderNumber();
+    let finalNumber = draftNumber;
+    let finalTotal = totalToPay;
+    let serverItems: OrderData['items'] | null = null;
+    let stamps: number | null = null;
+    let completed = false;
+
+    try {
+      const session = supabaseClient ? (await supabaseClient.auth.getSession()).data.session : null;
+      const res = await fetch('/api/orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify({
+          number: draftNumber,
+          items: cart.map((item) => ({
+            id: item.product.id,
+            name: item.product.name,
+            detail: item.selectedOption?.size || item.notes,
+            qty: item.quantity,
+          })),
+          customerName,
+          customerPhone,
+          deliveryType,
+          deliveryAddress,
+          paymentMethod: METHOD_LABEL[method],
+          notes: orderNotes,
+          couponCode,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.ok) {
+        // Errores de negocio (stock, cupón, producto no disponible) sí detienen la compra.
+        // Si la tienda está sin base de datos, seguimos con el pedido por WhatsApp
+        // para no perder la venta (el dueño recibe el aviso por correo).
+        const businessError = res.status === 400 || res.status === 409;
+        if (businessError) {
+          setPayError(data?.error || 'No pudimos registrar tu pedido. Intenta de nuevo.');
+          return;
+        }
+        setPayError('Guardando pedido en modo WhatsApp…');
+      }
+      finalNumber = data.order?.order_number || draftNumber;
+      finalTotal = Number(data.total) || totalToPay;
+      stamps = typeof data.stamps === 'number' ? data.stamps : null;
+      completed = Boolean(data.completed);
+      if (Array.isArray(data.order?.items)) {
+        serverItems = data.order.items.map((i: { name: string; detail?: string; qty: number; price: number }) => ({
+          name: i.name,
+          detail: i.detail,
+          qty: i.qty,
+          price: Number(i.price),
+        }));
+      }
+    } catch {
+      // Sin conexión con la tienda: el pedido sigue por WhatsApp igualmente.
+      setPayError('Sin conexión con la tienda. Tu pedido se enviará por WhatsApp.');
+    }
+
     const order: OrderData = {
-      number: createOrderNumber(),
+      number: finalNumber,
       timestamp: Date.now(),
       customerName,
       customerPhone,
       deliveryType,
       deliveryAddress,
       paymentMethod: METHOD_LABEL[method],
-      items: cart.map((item) => ({
-        name: item.product.name,
-        detail: item.selectedOption?.size || item.notes,
-        qty: item.quantity,
-        price: item.selectedOption ? item.selectedOption.price : item.product.price,
-      })),
+      items:
+        serverItems ||
+        cart.map((item) => ({
+          name: item.product.name,
+          detail: item.selectedOption?.size || item.notes,
+          qty: item.quantity,
+          price: item.selectedOption ? item.selectedOption.price : item.product.price,
+        })),
       notes: orderNotes,
-      total: Number(subtotal.toFixed(2)),
+      total: finalTotal,
     };
+
     openWhatsApp(buildMessage(extra));
-    onOrderComplete(order);
+    onOrderComplete(order, { stamps, completed });
     // Aviso por correo al dueño (no bloquea ni rompe el flujo si falla)
     try {
       fetch('/api/pedido-email', {
@@ -170,6 +250,8 @@ export default function CheckoutPayment({
           items: order.items,
           notes: order.notes,
           total: order.total,
+          couponCode,
+          discount: discountValue,
         }),
       }).catch(() => {});
     } catch {
@@ -207,7 +289,7 @@ export default function CheckoutPayment({
             quantity: item.quantity,
             unit_price: item.selectedOption ? item.selectedOption.price : item.product.price,
           })),
-          total: Number(subtotal.toFixed(2)),
+          total: Number(totalToPay.toFixed(2)),
           customerName,
           customerPhone,
           deliveryType,
@@ -274,7 +356,7 @@ export default function CheckoutPayment({
       const token: string = await new Promise((resolve, reject) => {
         kushki.requestToken(
           {
-            amount: Number(subtotal.toFixed(2)),
+            amount: Number(totalToPay.toFixed(2)),
             currency: 'USD',
             card: {
               name: cardName.trim(),
@@ -290,7 +372,7 @@ export default function CheckoutPayment({
       const r = await fetch('/api/pagos/kushki', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, amount: Number(subtotal.toFixed(2)) }),
+        body: JSON.stringify({ token, amount: Number(totalToPay.toFixed(2)) }),
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok || !d.approved) {
@@ -354,7 +436,7 @@ export default function CheckoutPayment({
       {method === 'transfer' && (
         <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4 space-y-2">
           <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
-            2. Transfiere ${subtotal.toFixed(2)} a:
+            2. Transfiere ${totalToPay.toFixed(2)} a:
           </p>
           {[
             { key: 'bank', label: 'Banco', value: BANK_ACCOUNT.bank },
@@ -468,7 +550,7 @@ export default function CheckoutPayment({
       {method === 'deuna' && (
         <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4 space-y-3 text-center">
           <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
-            Paga ${subtotal.toFixed(2)} con tu app DeUna 📱
+            Paga ${totalToPay.toFixed(2)} con tu app DeUna 📱
           </p>
           {qrOk && (
             // eslint-disable-next-line @next/next/no-img-element
@@ -527,7 +609,7 @@ export default function CheckoutPayment({
           className="w-full bg-gradient-to-r from-sky-600 to-blue-500 hover:from-sky-500 hover:to-blue-400 text-white font-black py-3.5 px-4 rounded-2xl flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(56,130,246,0.35)] hover:scale-[1.02] active:scale-95 transition-all text-sm disabled:opacity-60"
         >
           {paying ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
-          <span>{paying ? 'CONECTANDO…' : `PAGAR $${subtotal.toFixed(2)} CON TARJETA`}</span>
+          <span>{paying ? 'CONECTANDO…' : `PAGAR $${totalToPay.toFixed(2)} CON TARJETA`}</span>
         </button>
       )}
 
@@ -539,7 +621,7 @@ export default function CheckoutPayment({
           className="w-full bg-gradient-to-r from-violet-600 to-purple-500 hover:from-violet-500 hover:to-purple-400 text-white font-black py-3.5 px-4 rounded-2xl flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(139,92,246,0.35)] hover:scale-[1.02] active:scale-95 transition-all text-sm disabled:opacity-60"
         >
           {paying ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
-          <span>{paying ? 'PROCESANDO…' : `PAGAR $${subtotal.toFixed(2)} CON KUSHKI`}</span>
+          <span>{paying ? 'PROCESANDO…' : `PAGAR $${totalToPay.toFixed(2)} CON KUSHKI`}</span>
         </button>
       )}
 

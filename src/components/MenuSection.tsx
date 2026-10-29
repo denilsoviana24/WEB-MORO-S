@@ -2,7 +2,8 @@
 
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CATEGORIES, MENU_ITEMS, MenuItem } from '@/data/menuData';
+import { CATEGORIES, MenuItem } from '@/data/menuData';
+import { useProducts } from '@/context/ProductsContext';
 import MenuCard from './MenuCard';
 import MenuGalaxy from './MenuGalaxy';
 import ProductModal from './ProductModal';
@@ -10,6 +11,7 @@ import Reveal from './Reveal';
 import { Search, Utensils, Sparkles } from 'lucide-react';
 
 export default function MenuSection() {
+  const { products } = useProducts();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeModalItem, setActiveModalItem] = useState<MenuItem | null>(null);
   const [openCategory, setOpenCategory] = useState<string | null>(null);
@@ -17,21 +19,21 @@ export default function MenuSection() {
   const searchFiltered = useMemo(() => {
     if (!searchQuery.trim()) return null;
     const q = searchQuery.toLowerCase();
-    return MENU_ITEMS.filter(
+    return products.filter(
       (item) =>
         item.name.toLowerCase().includes(q) ||
         item.description.toLowerCase().includes(q)
     );
-  }, [searchQuery]);
+  }, [searchQuery, products]);
 
   const grouped = useMemo(() => {
     return CATEGORIES.filter((c) => c.id !== 'todos')
       .map((cat) => ({
         cat,
-        items: MENU_ITEMS.filter((item) => item.category === cat.id),
+        items: products.filter((item) => item.category === cat.id),
       }))
       .filter((g) => g.items.length > 0);
-  }, []);
+  }, [products]);
 
   return (
     <section id="menu" className="py-16 bg-zinc-950 relative">
