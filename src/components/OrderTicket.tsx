@@ -20,6 +20,13 @@ export interface OrderData {
   paymentMethod: string;
   items: TicketItem[];
   notes: string;
+  /** Desglose de cobros (factura). */
+  subtotal?: number;
+  discount?: number;
+  couponCode?: string | null;
+  tax?: number;
+  shipping?: number;
+  currency?: string;
   total: number;
 }
 
@@ -51,6 +58,13 @@ interface OrderTicketProps {
 
 export default function OrderTicket({ order, onClose }: OrderTicketProps) {
   const isPickup = order.deliveryType === 'pickup';
+
+  const money = (n: number) => `${Number(n || 0).toFixed(2)}`;
+  const itemsSum = order.items.reduce((sum, i) => sum + Number(i.price) * Number(i.qty), 0);
+  const subtotal = Number(order.subtotal ?? itemsSum);
+  const discount = Number(order.discount ?? 0);
+  const tax = Number(order.tax ?? 0);
+  const shipping = Number(order.shipping ?? 0);
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 overflow-y-auto">
@@ -134,10 +148,45 @@ export default function OrderTicket({ order, onClose }: OrderTicketProps) {
 
             <div className="border-t border-dashed border-zinc-300 my-3" />
 
+            {/* Desglose de cobros */}
+            <div className="space-y-1">
+              <div className="flex justify-between gap-2">
+                <span className="text-zinc-600">Subtotal</span>
+                <span className="font-bold whitespace-nowrap">${money(subtotal)}</span>
+              </div>
+
+              {discount > 0 && (
+                <div className="flex justify-between gap-2 text-emerald-700">
+                  <span className="font-bold">Cupón {order.couponCode || ''}</span>
+                  <span className="font-bold whitespace-nowrap">-${money(discount)}</span>
+                </div>
+              )}
+
+              {tax > 0 && (
+                <div className="flex justify-between gap-2">
+                  <span className="text-zinc-600">IVA</span>
+                  <span className="font-bold whitespace-nowrap">${money(tax)}</span>
+                </div>
+              )}
+
+              <div className="flex justify-between gap-2">
+                <span className="text-zinc-600">{isPickup ? 'Retiro en local' : 'Envío a domicilio'}</span>
+                <span className={`font-bold whitespace-nowrap ${shipping > 0 ? '' : 'text-emerald-700'}`}>
+                  {shipping > 0 ? `$${money(shipping)}` : 'Gratis'}
+                </span>
+              </div>
+            </div>
+
+            <div className="border-t border-dashed border-zinc-300 my-3" />
+
             <div className="flex justify-between items-center">
               <span className="font-black text-base">TOTAL</span>
-              <span className="font-black text-2xl">${order.total.toFixed(2)}</span>
+              <span className="font-black text-2xl">${money(order.total)}</span>
             </div>
+
+            <p className="text-right text-[10px] text-zinc-500 mt-0.5">
+              {order.items.reduce((s, i) => s + Number(i.qty), 0)} artículo(s)
+            </p>
 
             <div className="border-t border-dashed border-zinc-300 my-3" />
 

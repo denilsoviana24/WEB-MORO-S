@@ -315,6 +315,7 @@ export default function CheckoutPayment({
     let serverItems: OrderData['items'] | null = null;
     let stamps: number | null = null;
     let completed = false;
+    let serverTotals: { subtotal?: number; discount?: number; tax?: number; shipping?: number } = {};
 
     try {
       const session = supabaseClient ? (await supabaseClient.auth.getSession()).data.session : null;
@@ -362,6 +363,14 @@ export default function CheckoutPayment({
       stamps = typeof data.stamps === 'number' ? data.stamps : null;
       completed = Boolean(data.completed);
 
+      // Totales autoritativos del servidor para la factura
+      serverTotals = {
+        subtotal: Number.isFinite(Number(data.subtotal)) ? Number(data.subtotal) : undefined,
+        discount: Number.isFinite(Number(data.discount)) ? Number(data.discount) : undefined,
+        tax: Number.isFinite(Number(data.tax)) ? Number(data.tax) : undefined,
+        shipping: Number.isFinite(Number(data.shipping)) ? Number(data.shipping) : undefined,
+      };
+
       if (Array.isArray(data.order?.items)) {
         serverItems = data.order.items.map((i: { name: string; detail?: string; qty: number; price: number }) => ({
           name: i.name,
@@ -395,6 +404,12 @@ export default function CheckoutPayment({
           price: item.variant?.price ?? item.selectedOption?.price ?? item.product.price,
         })),
       notes,
+      subtotal: serverTotals.subtotal ?? displaySubtotal,
+      discount: serverTotals.discount ?? displayDiscount,
+      couponCode,
+      tax: serverTotals.tax ?? displayTax,
+      shipping: serverTotals.shipping ?? displayShipping,
+      currency: quote?.currency.code || currency?.code,
       total: finalTotal,
     };
 
@@ -415,8 +430,12 @@ export default function CheckoutPayment({
           items: order.items,
           notes: order.notes,
           total: order.total,
+          subtotal: order.subtotal,
           couponCode,
-          discount: displayDiscount,
+          discount: order.discount,
+          tax: order.tax,
+          shipping: order.shipping,
+          shippingMethod: quote?.shipping?.name || (deliveryType === 'pickup' ? 'Retiro en local' : null),
         }),
       }).catch(() => {});
     } catch {
