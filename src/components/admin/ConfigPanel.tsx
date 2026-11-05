@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Plus, Trash2, Save, Loader2, Coins, Percent, Truck, SlidersHorizontal } from 'lucide-react';
+import { Plus, Trash2, Pencil, Save, Loader2, Coins, Percent, Truck, SlidersHorizontal } from 'lucide-react';
 import { adminFetch, money } from '@/lib/adminClient';
 import type { Currency, ShippingMethod, StoreSettings, TaxRate } from '@/lib/catalog';
 
@@ -24,7 +24,24 @@ export default function ConfigPanel() {
 
   const [newCurrency, setNewCurrency] = useState({ code: '', name: '', symbol: '$', rate: '1', decimals: '2' });
   const [newTax, setNewTax] = useState({ name: '', rate: '' });
-  const [newMethod, setNewMethod] = useState({ name: '', cost: '', free_over: '', eta: '' });
+  const [newMethod, setNewMethod] = useState({
+    name: '',
+    type: 'flat' as 'flat' | 'free' | 'per_item',
+    cost: '',
+    per_item: '',
+    free_over: '',
+    eta: '',
+  });
+  const [editMethod, setEditMethod] = useState<{
+    id: string;
+    name: string;
+    type: 'flat' | 'free' | 'per_item';
+    cost: string;
+    per_item: string;
+    free_over: string;
+    eta: string;
+    active: boolean;
+  } | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -121,17 +138,47 @@ export default function ConfigPanel() {
           resource: 'method',
           zone_id: zones[0]?.id || null,
           name: newMethod.name,
-          type: Number(newMethod.cost) > 0 ? 'flat' : 'free',
+          type: newMethod.type,
           cost: Number(newMethod.cost) || 0,
+          per_item: Number(newMethod.per_item) || 0,
           free_over: newMethod.free_over === '' ? null : Number(newMethod.free_over),
           eta: newMethod.eta,
         }),
       });
-      setNewMethod({ name: '', cost: '', free_over: '', eta: '' });
+      setNewMethod({ name: '', type: 'flat', cost: '', per_item: '', free_over: '', eta: '' });
       await load();
       flash('Método de envío añadido.');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo añadir.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const saveMethod = async () => {
+    if (!editMethod) return;
+    setBusy(true);
+    setError('');
+    try {
+      await adminFetch('/api/admin/config', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          resource: 'method',
+          id: editMethod.id,
+          name: editMethod.name,
+          type: editMethod.type,
+          cost: Number(editMethod.cost) || 0,
+          per_item: Number(editMethod.per_item) || 0,
+          free_over: editMethod.free_over === '' ? null : Number(editMethod.free_over),
+          eta: editMethod.eta,
+          active: editMethod.active,
+        }),
+      });
+      setEditMethod(null);
+      await load();
+      flash('Método de envío actualizado.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo guardar.');
     } finally {
       setBusy(false);
     }
@@ -336,45 +383,142 @@ export default function ConfigPanel() {
           <Truck className="w-4 h-4 text-amber-400" /> Métodos de envío
         </h3>
 
-        <div className="space-y-1.5 mb-3">
-          {methods.map((m) => (
-            <div key={m.id} className="flex flex-wrap items-center gap-3 text-xs bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2">
-              <strong className="text-zinc-100">{m.name}</strong>
-              <span className="text-zinc-500">{m.type === 'free' ? 'Gratis' : m.type === 'per_item' ? 'Por ítem' : 'Tarifa fija'}</span>
-              <span className="text-zinc-300">{money(Number(m.cost))}</span>
-              {m.free_over ? <span className="text-emerald-400">gratis desde {money(Number(m.free_over))}</span> : null}
-              {m.eta && <span className="text-zinc-500">{m.eta}</span>}
-              <div className="ml-auto flex items-center gap-2">
-                <button
-                  onClick={async () => {
-                    await adminFetch('/api/admin/config', {
-                      method: 'PATCH',
-                      body: JSON.stringify({ resource: 'method', id: m.id, active: !m.active }),
-                    });
-                    await load();
-                  }}
-                  className={`px-2 py-0.5 rounded-full text-[10px] font-black border ${
-                    m.active ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' : 'bg-zinc-800 text-zinc-400 border-zinc-700'
-                  }`}
-                >
-                  {m.active ? 'Activo' : 'Inactivo'}
-                </button>
-                <button
-                  onClick={async () => {
-                    await adminFetch(`/api/admin/config?resource=method&id=${m.id}`, { method: 'DELETE' });
-                    await load();
-                  }}
-                  className="text-zinc-500 hover:text-red-400"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+        <div className="space-y-2 mb-3">
+          {methods.map((m) => {
+            const editing = editMethod?.id === m.id;
+
+            if (editing && editMethod) {
+              return (
+                <div key={m.id} className="bg-zinc-950 border border-amber-500/40 rounded-xl p-3 space-y-2">
+                  <div className="grid sm:grid-cols-2 gap-2">
+                    <div>
+                      <label className={label}>Nombre</label>
+                      <input className={input} value={editMethod.name} onChange={(e) => setEditMethod({ ...editMethod, name: e.target.value })} />
+                    </div>
+                    <div>
+                      <label className={label}>Tipo</label>
+                      <select
+                        className={input}
+                        value={editMethod.type}
+                        onChange={(e) => setEditMethod({ ...editMethod, type: e.target.value as 'flat' | 'free' | 'per_item' })}
+                      >
+                        <option value="flat">Tarifa fija</option>
+                        <option value="free">Gratis</option>
+                        <option value="per_item">Costo + por ítem</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className={label}>Costo</label>
+                      <input className={input} type="number" step="0.01" value={editMethod.cost} onChange={(e) => setEditMethod({ ...editMethod, cost: e.target.value })} />
+                    </div>
+                    <div>
+                      <label className={label}>Extra por ítem</label>
+                      <input className={input} type="number" step="0.01" value={editMethod.per_item} onChange={(e) => setEditMethod({ ...editMethod, per_item: e.target.value })} />
+                    </div>
+                    <div>
+                      <label className={label}>Gratis desde</label>
+                      <input className={input} type="number" step="0.01" placeholder="Sin límite" value={editMethod.free_over} onChange={(e) => setEditMethod({ ...editMethod, free_over: e.target.value })} />
+                    </div>
+                    <div>
+                      <label className={label}>Tiempo estimado</label>
+                      <input className={input} placeholder="30-45 min" value={editMethod.eta} onChange={(e) => setEditMethod({ ...editMethod, eta: e.target.value })} />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1">
+                    <label className="flex items-center gap-2 text-xs font-bold text-zinc-300">
+                      <input type="checkbox" checked={editMethod.active} onChange={(e) => setEditMethod({ ...editMethod, active: e.target.checked })} className="accent-amber-500" />
+                      Activo
+                    </label>
+                    <div className="flex gap-2">
+                      <button onClick={() => setEditMethod(null)} className="px-3 py-1.5 rounded-lg text-[11px] font-bold text-zinc-300 bg-zinc-800 hover:bg-zinc-700">
+                        Cancelar
+                      </button>
+                      <button
+                        onClick={saveMethod}
+                        disabled={busy || !editMethod.name}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-black text-zinc-950 bg-amber-500 hover:bg-amber-400 disabled:opacity-50"
+                      >
+                        <Save className="w-3.5 h-3.5" /> Guardar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+
+            return (
+              <div key={m.id} className="flex flex-wrap items-center gap-3 text-xs bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2">
+                <strong className="text-zinc-100">{m.name}</strong>
+                <span className="text-zinc-500">{m.type === 'free' ? 'Gratis' : m.type === 'per_item' ? 'Por ítem' : 'Tarifa fija'}</span>
+                <span className="text-zinc-300">{money(Number(m.cost))}</span>
+                {Number(m.per_item) > 0 && <span className="text-zinc-500">+ {money(Number(m.per_item))}/ítem</span>}
+                {m.free_over ? <span className="text-emerald-400">gratis desde {money(Number(m.free_over))}</span> : null}
+                {m.eta && <span className="text-zinc-500">{m.eta}</span>}
+                <div className="ml-auto flex items-center gap-2">
+                  <button
+                    onClick={async () => {
+                      await adminFetch('/api/admin/config', {
+                        method: 'PATCH',
+                        body: JSON.stringify({ resource: 'method', id: m.id, active: !m.active }),
+                      });
+                      await load();
+                    }}
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-black border ${
+                      m.active ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' : 'bg-zinc-800 text-zinc-400 border-zinc-700'
+                    }`}
+                  >
+                    {m.active ? 'Activo' : 'Inactivo'}
+                  </button>
+                  <button
+                    onClick={() =>
+                      setEditMethod({
+                        id: m.id,
+                        name: m.name,
+                        type: m.type,
+                        cost: String(m.cost ?? 0),
+                        per_item: String(m.per_item ?? 0),
+                        free_over: m.free_over === null || m.free_over === undefined ? '' : String(m.free_over),
+                        eta: m.eta || '',
+                        active: m.active,
+                      })
+                    }
+                    className="p-1.5 rounded-lg text-zinc-300 hover:bg-zinc-800"
+                    title="Editar"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (!confirm(`¿Borrar el método "${m.name}"?`)) return;
+                      await adminFetch(`/api/admin/config?resource=method&id=${m.id}`, { method: 'DELETE' });
+                      await load();
+                    }}
+                    className="text-zinc-500 hover:text-red-400"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
+
+          {methods.length === 0 && (
+            <p className="text-xs text-zinc-500">No hay métodos de envío. Añade al menos uno.</p>
+          )}
         </div>
 
-        <div className="grid sm:grid-cols-5 gap-2">
+        <div className="grid sm:grid-cols-6 gap-2">
           <input className={`${input} sm:col-span-2`} placeholder="Domicilio" value={newMethod.name} onChange={(e) => setNewMethod({ ...newMethod, name: e.target.value })} />
+          <select
+            className={input}
+            value={newMethod.type}
+            onChange={(e) => setNewMethod({ ...newMethod, type: e.target.value as 'flat' | 'free' | 'per_item' })}
+          >
+            <option value="flat">Tarifa fija</option>
+            <option value="free">Gratis</option>
+            <option value="per_item">Costo + por ítem</option>
+          </select>
           <input className={input} type="number" step="0.01" placeholder="Costo" value={newMethod.cost} onChange={(e) => setNewMethod({ ...newMethod, cost: e.target.value })} />
           <input className={input} type="number" step="0.01" placeholder="Gratis desde" value={newMethod.free_over} onChange={(e) => setNewMethod({ ...newMethod, free_over: e.target.value })} />
           <button
