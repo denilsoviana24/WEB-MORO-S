@@ -178,7 +178,10 @@ export default function CheckoutPayment({
       const data = await res.json();
       if (data?.ok) {
         setQuote(data);
-        if (!shippingMethodId && data.shipping?.id) setShippingMethodId(data.shipping.id);
+        const ids = (data.shippingOptions || []).map((o: { id: string }) => o.id);
+        if (data.shipping?.id && (!shippingMethodId || !ids.includes(shippingMethodId))) {
+          setShippingMethodId(data.shipping.id);
+        }
       }
     } catch {
       // se conserva el cálculo local
@@ -191,6 +194,11 @@ export default function CheckoutPayment({
     loadQuote();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quoteItems.length, deliveryType, region, shippingMethodId, couponCode]);
+
+  // Al cambiar entre domicilio y retiro, se vuelve a elegir el método correcto.
+  useEffect(() => {
+    setShippingMethodId(null);
+  }, [deliveryType]);
 
   const totals = quote?.totals;
   const localDiscount = Math.max(0, Number(discount) || 0);

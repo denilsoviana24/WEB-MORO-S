@@ -11,6 +11,12 @@ import { addLoyaltyStamp } from '@/lib/loyalty';
 import { STAMPS_GOAL } from '@/data/loyaltyData';
 import { friesRain } from '@/lib/friesRain';
 import { useAuth } from '@/context/AuthContext';
+import { useProducts } from '@/context/ProductsContext';
+
+interface ShopQuote {
+  totals: { subtotal: number; discount: number; tax: number; shipping: number; total: number };
+  shipping: { id: string; name: string; cost: number } | null;
+}
 
 export default function CartDrawer() {
   const { cart, isCartOpen, setIsCartOpen, removeFromCart, updateQuantity, clearCart, subtotal, totalItems } = useCart();
@@ -27,8 +33,47 @@ export default function CartDrawer() {
   const [discount, setDiscount] = useState(0);
   const [couponMsg, setCouponMsg] = useState('');
   const [couponLoading, setCouponLoading] = useState(false);
+  const { variantsFor } = useProducts();
+  const [quote, setQuote] = useState<ShopQuote | null>(null);
 
   const total = Math.max(0, Math.round((subtotal - discount) * 100) / 100);
+
+  // Tarifa de envío e impuestos en vivo (se recalcula al cambiar modalidad o carrito)
+  useEffect(() => {
+    if (!isCartOpen || cart.length === 0) {
+      setQuote(null);
+      return;
+    }
+
+    const items = cart
+      .map((item) => ({
+        variantId: item.variant?.id || variantsFor(item.product.id)[0]?.id,
+        qty: item.quantity,
+      }))
+      .filter((i): i is { variantId: string; qty: number } => Boolean(i.variantId));
+
+    if (!items.length) {
+      setQuote(null);
+      return;
+    }
+
+    let alive = true;
+    fetch('/api/checkout/quote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items, deliveryType, couponCode }),
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        if (alive && d?.ok) setQuote(d);
+      })
+      .catch(() => {});
+
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCartOpen, cart, deliveryType, couponCode, variantsFor]);
 
   const applyCoupon = async () => {
     const code = couponInput.trim();
@@ -399,24 +444,39 @@ export default function CartDrawer() {
               <div className="space-y-1 text-xs">
                 <div className="flex justify-between text-zinc-400">
                   <span>Subtotal:</span>
-                  <span className="font-bold text-white">${subtotal.toFixed(2)}</span>
+                  <span className="font-bold text-white">${(quote?.totals.subtotal ?? subtotal).toFixed(2)}</span>
                 </div>
-                {discount > 0 && (
+                {(quote?.totals.discount ?? discount) > 0 && (
                   <div className="flex justify-between text-emerald-400 font-bold">
                     <span>Cupón {couponCode}:</span>
-                    <span>-${discount.toFixed(2)}</span>
+                    <span>-${(quote?.totals.discount ?? discount).toFixed(2)}</span>
+                  </div>
+                )}
+                {(quote?.totals.tax ?? 0) > 0 && (
+                  <div className="flex justify-between text-zinc-400">
+                    <span>IVA:</span>
+                    <span className="text-white">${(quote?.totals.tax ?? 0).toFixed(2)}</span>
                   </div>
                 )}
                 <div className="flex justify-between text-zinc-400">
-                  <span>Costo de envío:</span>
+                  <span>{deliveryType === 'delivery' ? 'Envío a domicilio:' : 'Costo de envío:'}</span>
                   <span className="text-emerald-400 font-bold">
-                    {deliveryType === 'delivery' ? 'A convenir con repartidor' : 'Gratis'}
+                    {deliveryType === 'delivery'
+                      ? quote
+                        ? `$${quote.totals.shipping.toFixed(2)}`
+                        : 'Calculando…'
+                      : 'Gratis'}
                   </span>
                 </div>
                 <div className="flex justify-between text-base font-black text-white pt-2 border-t border-zinc-800">
                   <span>Total estimado:</span>
-                  <span className="text-amber-400">${total.toFixed(2)}</span>
+                  <span className="text-amber-400">${(quote?.totals.total ?? total).toFixed(2)}</span>
                 </div>
+                {deliveryType === 'delivery' && quote && quote.totals.shipping > 0 && (
+                  <p className="text-[10px] text-zinc-500">
+                    Incluye la tarifa de envío a domicilio.
+                  </p>
+                )}
               </div>
 
               <button
