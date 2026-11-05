@@ -144,10 +144,7 @@ export function formatMoney(
   const decimals = currency?.decimals ?? 2;
   const symbol = currency?.symbol || fallbackSymbol;
   const n = Number(amount) || 0;
-  const value = n.toLocaleString('es-EC', {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  });
+  const value = n.toFixed(decimals);
   return currency?.symbol_position === 'after' ? `${value} ${symbol}` : `${symbol}${value}`;
 }
 
