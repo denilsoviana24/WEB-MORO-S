@@ -84,16 +84,41 @@ export async function POST(req: Request) {
 
   /* 1) Resolver variantes y productos ---------------------------- */
   const variantIds = rawItems.map((i) => i.variantId).filter(Boolean) as string[];
-  const productIds = rawItems.map((i) => i.id).filter(Boolean) as string[];
+  const explicitProductIds = rawItems.map((i) => i.id).filter(Boolean) as string[];
 
-  const [{ data: variantRows }, { data: productRows }, { data: settingsRow }, { data: taxes }, { data: currencies }] =
+  const [{ data: variantRows }, { data: settingsRow }, { data: taxes }, { data: currencies }] =
     await Promise.all([
       variantIds.length ? svc.from('product_variants').select('*').in('id', variantIds) : Promise.resolve({ data: [] }),
-      productIds.length ? svc.from('products').select('*').in('id', productIds) : Promise.resolve({ data: [] }),
       svc.from('store_settings').select('*').eq('id', 1).maybeSingle(),
       svc.from('tax_rates').select('*').eq('active', true),
       svc.from('currencies').select('*').eq('active', true),
     ]);
+
+  // Los productos salen de las variantes y también de los ids enviados (carritos antiguos).
+  const productIds = [
+    ...new Set([
+      ...explicitProductIds,
+      ...(variantRows || []).map((v) => v.product_id as string),
+    ]),
+  ];
+
+  const { data: productData } = productIds.length
+    ? await svc.from('products').select('*').in('id', productIds)
+    : { data: [] };
+
+  const productRows = (productData || []) as {
+    id: string;
+    name: string;
+    price: number;
+    sale_price: number | null;
+    stock: number | null;
+    options: { size: string; price: number }[] | null;
+    active: boolean;
+    tax_rate_id: string | null;
+    type: string;
+    dropship: boolean | null;
+    supplier: string | null;
+  }[];
 
   const settings: StoreSettings = { ...SETTINGS_DEFAULT, ...(settingsRow || {}) };
   const taxList = (taxes || []) as TaxRate[];
