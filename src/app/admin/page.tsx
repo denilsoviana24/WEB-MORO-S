@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { LayoutDashboard, Package, ShoppingBag, Ticket, Users, Inbox, LogIn, ShieldAlert, ArrowLeft } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingBag, Ticket, Users, Inbox, Boxes, Warehouse, SlidersHorizontal, LogIn, ShieldAlert, ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import StatsPanel from '@/components/admin/StatsPanel';
 import ProductsPanel from '@/components/admin/ProductsPanel';
@@ -10,16 +10,22 @@ import OrdersPanel from '@/components/admin/OrdersPanel';
 import CouponsPanel from '@/components/admin/CouponsPanel';
 import CustomersPanel from '@/components/admin/CustomersPanel';
 import MessagesPanel from '@/components/admin/MessagesPanel';
+import CatalogPanel from '@/components/admin/CatalogPanel';
+import StockPanel from '@/components/admin/StockPanel';
+import ConfigPanel from '@/components/admin/ConfigPanel';
 
-type Tab = 'resumen' | 'productos' | 'pedidos' | 'cupones' | 'clientes' | 'mensajes';
+type Tab = 'resumen' | 'productos' | 'catalogo' | 'inventario' | 'pedidos' | 'cupones' | 'clientes' | 'mensajes' | 'config';
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'resumen', label: 'Resumen', icon: <LayoutDashboard className="w-4 h-4" /> },
   { id: 'productos', label: 'Productos', icon: <Package className="w-4 h-4" /> },
+  { id: 'catalogo', label: 'Catálogo', icon: <Boxes className="w-4 h-4" /> },
+  { id: 'inventario', label: 'Inventario', icon: <Warehouse className="w-4 h-4" /> },
   { id: 'pedidos', label: 'Pedidos', icon: <ShoppingBag className="w-4 h-4" /> },
   { id: 'cupones', label: 'Cupones', icon: <Ticket className="w-4 h-4" /> },
   { id: 'clientes', label: 'Clientes', icon: <Users className="w-4 h-4" /> },
   { id: 'mensajes', label: 'Mensajes', icon: <Inbox className="w-4 h-4" /> },
+  { id: 'config', label: 'Configuración', icon: <SlidersHorizontal className="w-4 h-4" /> },
 ];
 
 export default function AdminPage() {
@@ -127,10 +133,13 @@ export default function AdminPage() {
       <div className="bg-zinc-950/60 border border-zinc-900 rounded-3xl p-4 sm:p-6">
         {tab === 'resumen' && <StatsPanel />}
         {tab === 'productos' && <ProductsPanel />}
+        {tab === 'catalogo' && <CatalogPanel />}
+        {tab === 'inventario' && <StockPanel />}
         {tab === 'pedidos' && <OrdersPanel />}
         {tab === 'cupones' && <CouponsPanel />}
         {tab === 'clientes' && <CustomersPanel />}
         {tab === 'mensajes' && <MessagesPanel />}
+        {tab === 'config' && <ConfigPanel />}
       </div>
 
       <p className="text-[11px] text-zinc-600 text-center mt-6">

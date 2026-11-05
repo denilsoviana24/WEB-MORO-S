@@ -79,6 +79,26 @@ export async function POST(req: Request) {
 
   const { data, error } = await guard.svc.from('products').insert(payload).select('*').single();
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+
+  // Cada producto nace con su variante por defecto (el stock vive en las variantes).
+  if (data) {
+    const stock = data.stock === null || data.stock === undefined ? 0 : Number(data.stock);
+    await guard.svc.from('product_variants').insert({
+      product_id: data.id,
+      sku: data.sku || `MOR-${String(data.id).slice(0, 8).toUpperCase()}`,
+      title: 'Único',
+      attributes: {},
+      price: Number(data.price) || 0,
+      sale_price: data.sale_price === null ? null : Number(data.sale_price),
+      stock,
+      manage_stock: data.stock !== null && data.stock !== undefined,
+      active: true,
+    });
+    if (data.stock !== null && data.stock !== undefined) {
+      await guard.svc.rpc('sync_product_stock', { p_product: data.id });
+    }
+  }
+
   return NextResponse.json({ product: data });
 }
 
@@ -101,6 +121,30 @@ export async function PATCH(req: Request) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+
+  // Mantiene sincronizada la variante única (precio y stock) de productos simples.
+  if (data) {
+    const { data: variants } = await guard.svc
+      .from('product_variants')
+      .select('id,attributes')
+      .eq('product_id', id);
+
+    const single = (variants || []).filter((v) => Object.keys(v.attributes || {}).length === 0);
+    if (variants && variants.length === 1 && single.length === 1) {
+      const patch: Record<string, unknown> = {};
+      if (payload.price !== undefined) patch.price = Number(payload.price);
+      if (payload.sale_price !== undefined) patch.sale_price = payload.sale_price;
+      if (payload.stock !== undefined) {
+        patch.stock = payload.stock === null ? 0 : Number(payload.stock);
+        patch.manage_stock = payload.stock !== null;
+      }
+      if (payload.sku !== undefined) patch.sku = payload.sku;
+      if (Object.keys(patch).length) {
+        await guard.svc.from('product_variants').update(patch).eq('id', single[0].id);
+      }
+    }
+  }
+
   return NextResponse.json({ product: data });
 }
 

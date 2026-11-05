@@ -1,27 +1,34 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import confetti from 'canvas-confetti';
 import {
   ArrowLeft,
+  ArrowRight,
   Send,
   Copy,
   Check,
   Loader2,
   ShieldCheck,
   CreditCard,
+  User,
+  MapPin,
+  Truck,
+  Store,
+  Wallet,
+  AlertCircle,
+  Tag,
 } from 'lucide-react';
 import type { CartItem } from '@/context/CartContext';
+import { useProducts } from '@/context/ProductsContext';
 import { supabase as supabaseClient } from '@/lib/supabaseClient';
 import { RESTAURANT_INFO } from '@/data/menuData';
 import { createOrderNumber, type OrderData } from '@/components/OrderTicket';
+import { formatMoney } from '@/lib/catalog';
 import {
   PAYMENT_METHODS,
   BANK_ACCOUNT,
   MERCADOPAGO_LINK,
-  KUSHKI_PAYMENT_LINK,
-  KUSHKI_PUBLIC_KEY,
-  KUSHKI_ENV,
   DEUNA_LINK,
   DEUNA_QR,
   type PaymentMethodId,
@@ -38,10 +45,7 @@ interface CheckoutPaymentProps {
   deliveryAddress: string;
   orderNotes: string;
   onBack: () => void;
-  onOrderComplete: (
-    order: OrderData,
-    result?: { stamps?: number | null; completed?: boolean }
-  ) => void;
+  onOrderComplete: (order: OrderData, result?: { stamps?: number | null; completed?: boolean }) => void;
 }
 
 const METHOD_LABEL: Record<PaymentMethodId, string> = {
@@ -52,106 +56,251 @@ const METHOD_LABEL: Record<PaymentMethodId, string> = {
   deuna: 'DeUna (Banco Pichincha)',
 };
 
-interface KushkiInstance {
-  requestToken: (
-    params: Record<string, unknown>,
-    cb: (res: { token?: string; message?: string }) => void
-  ) => void;
+interface QuoteLine {
+  variantId: string;
+  name: string;
+  variant: string;
+  qty: number;
+  unitPrice: number;
+  net: number;
+  tax: number;
+  taxRate: number;
+  available: number | null;
 }
 
-function loadKushkiScript(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if ((window as unknown as { Kushki?: unknown }).Kushki) return resolve();
-    const s = document.createElement('script');
-    s.src = 'https://cdn.kushkipagos.com/kushki.min.js';
-    s.async = true;
-    s.onload = () => resolve();
-    s.onerror = () => reject(new Error('cdn'));
-    document.head.appendChild(s);
-  });
+interface ShippingOption {
+  id: string;
+  name: string;
+  type: string;
+  eta: string | null;
+  cost: number;
 }
 
-function getKushki(publicId: string): KushkiInstance | null {
-  const K = (
-    window as unknown as {
-      Kushki?: new (cfg: { merchantId: string; inTestEnvironment: boolean }) => KushkiInstance;
-    }
-  ).Kushki;
-  if (!K) return null;
-  try {
-    return new K({ merchantId: publicId, inTestEnvironment: KUSHKI_ENV !== 'production' });
-  } catch {
-    return null;
-  }
+interface Quote {
+  currency: { code: string; symbol: string; position: string; decimals: number };
+  lines: QuoteLine[];
+  shippingOptions: ShippingOption[];
+  shipping: ShippingOption | null;
+  coupon: { code: string | null; discount: number; error: string | null };
+  totals: {
+    itemsQty: number;
+    subtotal: number;
+    discount: number;
+    tax: number;
+    shipping: number;
+    total: number;
+    pricesIncludeTax: boolean;
+  };
+  warnings: string[];
 }
+
+const STEPS = [
+  { id: 1, label: 'Datos', icon: <User className="w-4 h-4" /> },
+  { id: 2, label: 'Entrega', icon: <MapPin className="w-4 h-4" /> },
+  { id: 3, label: 'Envío', icon: <Truck className="w-4 h-4" /> },
+  { id: 4, label: 'Pago', icon: <Wallet className="w-4 h-4" /> },
+];
 
 export default function CheckoutPayment({
   cart,
   subtotal,
   discount = 0,
   couponCode = null,
-  deliveryType,
-  customerName,
-  customerPhone,
-  deliveryAddress,
-  orderNotes,
+  deliveryType: initialDelivery,
+  customerName: initialName,
+  customerPhone: initialPhone,
+  deliveryAddress: initialAddress,
+  orderNotes: initialNotes,
   onBack,
   onOrderComplete,
 }: CheckoutPaymentProps) {
+  const { variantsFor, currency } = useProducts();
+
+  const [step, setStep] = useState(1);
+  const [name, setName] = useState(initialName);
+  const [phone, setPhone] = useState(initialPhone);
+  const [email, setEmail] = useState('');
+  const [deliveryType, setDeliveryType] = useState<'pickup' | 'delivery'>(initialDelivery);
+  const [address, setAddress] = useState(initialAddress);
+  const [reference, setReference] = useState('');
+  const [region, setRegion] = useState('Tulcán');
+  const [shippingMethodId, setShippingMethodId] = useState<string | null>(null);
   const [method, setMethod] = useState<PaymentMethodId>('cash');
-  const [paying, setPaying] = useState(false);
+  const [notes, setNotes] = useState(initialNotes);
+
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [validating, setValidating] = useState(false);
+  const [quote, setQuote] = useState<Quote | null>(null);
+  const [quoting, setQuoting] = useState(false);
+  const [placing, setPlacing] = useState(false);
   const [payError, setPayError] = useState('');
   const [copied, setCopied] = useState<string | null>(null);
-  // Formulario de tarjeta (Kushki)
-  const [cardName, setCardName] = useState('');
-  const [cardNumber, setCardNumber] = useState('');
-  const [cardExpMM, setCardExpMM] = useState('');
-  const [cardExpYY, setCardExpYY] = useState('');
-  const [cardCvc, setCardCvc] = useState('');
-  const [qrOk, setQrOk] = useState(true);
 
-  const discountValue = Math.max(0, Number(discount) || 0);
-  const totalToPay = Math.max(0, Math.round((subtotal - discountValue) * 100) / 100);
+  const money = (n: number) =>
+    formatMoney(
+      n,
+      quote
+        ? { symbol: quote.currency.symbol, symbol_position: quote.currency.position === 'after' ? 'after' : 'before', decimals: quote.currency.decimals }
+        : currency
+        ? { symbol: currency.symbol, symbol_position: currency.symbol_position, decimals: currency.decimals }
+        : null
+    );
 
-  const buildMessage = (extra?: string) => {
+  /* --- Items para el servidor (variante real de cada línea) --- */
+  const quoteItems = useMemo(
+    () =>
+      cart
+        .map((item) => ({
+          variantId: item.variant?.id || variantsFor(item.product.id)[0]?.id || null,
+          qty: item.quantity,
+        }))
+        .filter((i): i is { variantId: string; qty: number } => Boolean(i.variantId)),
+    [cart, variantsFor]
+  );
+
+  /* --- Totales dinámicos (impuestos + envío) por AJAX --- */
+  const loadQuote = useCallback(async () => {
+    if (!quoteItems.length) return;
+    setQuoting(true);
+    try {
+      const res = await fetch('/api/checkout/quote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: quoteItems,
+          deliveryType,
+          region,
+          shippingMethodId,
+          couponCode,
+          currency: currency?.code,
+        }),
+      });
+      const data = await res.json();
+      if (data?.ok) {
+        setQuote(data);
+        if (!shippingMethodId && data.shipping?.id) setShippingMethodId(data.shipping.id);
+      }
+    } catch {
+      // se conserva el cálculo local
+    } finally {
+      setQuoting(false);
+    }
+  }, [quoteItems, deliveryType, region, shippingMethodId, couponCode, currency?.code]);
+
+  useEffect(() => {
+    loadQuote();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quoteItems.length, deliveryType, region, shippingMethodId, couponCode]);
+
+  const totals = quote?.totals;
+  const localDiscount = Math.max(0, Number(discount) || 0);
+  const displaySubtotal = totals?.subtotal ?? subtotal;
+  const displayDiscount = totals?.discount ?? localDiscount;
+  const displayTax = totals?.tax ?? 0;
+  const displayShipping = totals?.shipping ?? 0;
+  const totalToPay =
+    totals?.total ?? Math.max(0, Math.round((subtotal - localDiscount) * 100) / 100);
+
+  const stepError = (field: string) => errors[field];
+
+  /* --- Validación asíncrona por paso --- */
+  const validateStep = async (current: number): Promise<boolean> => {
+    const data = {
+      customerName: name,
+      customerPhone: phone,
+      email,
+      deliveryType,
+      deliveryAddress: address,
+      addressReference: reference,
+      region,
+      shippingMethodId,
+      paymentMethod: METHOD_LABEL[method],
+    };
+
+    const stepName = current === 1 ? 'personal' : current === 2 ? 'address' : current === 3 ? 'shipping' : 'payment';
+
+    setValidating(true);
+    setErrors({});
+    try {
+      const res = await fetch('/api/checkout/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ step: stepName, data }),
+      });
+      const json = await res.json();
+      if (!json.ok) {
+        setErrors(json.errors || {});
+        return false;
+      }
+      return true;
+    } catch {
+      setErrors({ _: 'No pudimos validar. Revisa tu conexión.' });
+      return false;
+    } finally {
+      setValidating(false);
+    }
+  };
+
+  const next = async () => {
+    const ok = await validateStep(step);
+    if (ok) setStep((s) => Math.min(4, s + 1));
+  };
+
+  const back = () => {
+    setErrors({});
+    if (step === 1) onBack();
+    else setStep((s) => s - 1);
+  };
+
+  /* --- Mensaje de WhatsApp --- */
+  const buildMessage = () => {
     let message = `*🍔 NUEVO PEDIDO - MORO'S COMIDAS RÁPIDAS*\n`;
     message += `-----------------------------------------\n`;
-    message += `*Cliente:* ${customerName}\n`;
-    if (customerPhone) message += `*Teléfono:* ${customerPhone}\n`;
+    message += `*Cliente:* ${name}\n`;
+    if (phone) message += `*Teléfono:* ${phone}\n`;
+    if (email) message += `*Correo:* ${email}\n`;
     message += `*Tipo de Pedido:* ${deliveryType === 'delivery' ? '🛵 ENTREGA A DOMICILIO' : '📍 RETIRO EN LOCAL'}\n`;
-    if (deliveryType === 'delivery') message += `*Dirección:* ${deliveryAddress}\n`;
+    if (deliveryType === 'delivery') {
+      message += `*Dirección:* ${address}${reference ? ` (${reference})` : ''}\n`;
+      message += `*Ciudad/Sector:* ${region}\n`;
+    }
     message += `*Método de pago:* ${METHOD_LABEL[method]}\n`;
     message += `\n*DETALLE DEL PEDIDO:*\n`;
+
     cart.forEach((item, index) => {
-      const optionText = item.selectedOption ? ` (${item.selectedOption.size})` : '';
-      const price = item.selectedOption ? item.selectedOption.price : item.product.price;
-      message += `${index + 1}. *${item.quantity}x ${item.product.name}*${optionText} - $${(price * item.quantity).toFixed(2)}\n`;
+      const label = item.variant?.label || (item.selectedOption ? item.selectedOption.size : '');
+      const price = item.variant?.price ?? item.selectedOption?.price ?? item.product.price;
+      message += `${index + 1}. *${item.quantity}x ${item.product.name}*${label ? ` (${label})` : ''} - ${money(price * item.quantity)}\n`;
       if (item.notes) message += `   _Nota: ${item.notes}_\n`;
     });
-    if (orderNotes) message += `\n*Notas Generales:* ${orderNotes}\n`;
+
+    if (notes) message += `\n*Notas Generales:* ${notes}\n`;
     message += `-----------------------------------------\n`;
-    if (discountValue > 0) {
-      message += `*Subtotal:* $${subtotal.toFixed(2)}\n`;
-      message += `*Cupón ${couponCode || ''}:* -$${discountValue.toFixed(2)}\n`;
+    if (displayDiscount > 0) {
+      message += `*Subtotal:* ${money(displaySubtotal)}\n`;
+      message += `*Cupón ${couponCode || ''}:* -${money(displayDiscount)}\n`;
     }
-    message += `*TOTAL A PAGAR:* $${totalToPay.toFixed(2)}\n`;
+    if (displayTax > 0) message += `*IVA:* ${money(displayTax)}\n`;
+    if (displayShipping > 0) message += `*Envío:* ${money(displayShipping)}\n`;
+    message += `*TOTAL A PAGAR:* ${money(totalToPay)}\n`;
     message += `-----------------------------------------\n`;
-    if (extra) message += `${extra}\n`;
-    message += `¡Gracias por preferir Moro's! Quedo a la espera de su confirmación.`;
+    message += `¡Gracias por tu pedido! 🍟`;
     return message;
   };
 
-  const openWhatsApp = (message: string) => {
+  const openWhatsApp = () => {
     confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
     window.open(
-      `https://wa.me/${RESTAURANT_INFO.whatsappFormatted}?text=${encodeURIComponent(message)}`,
+      `https://wa.me/${RESTAURANT_INFO.whatsappFormatted}?text=${encodeURIComponent(buildMessage())}`,
       '_blank'
     );
   };
 
-  // Arma el pedido, lo registra en la tienda, lo envía por WhatsApp y genera el comprobante
-  const completeOrder = async (extra?: string) => {
+  /* --- Confirmar pedido --- */
+  const completeOrder = async () => {
     setPayError('');
+    setPlacing(true);
+
     const draftNumber = createOrderNumber();
     let finalNumber = draftNumber;
     let finalTotal = totalToPay;
@@ -170,36 +319,41 @@ export default function CheckoutPayment({
         body: JSON.stringify({
           number: draftNumber,
           items: cart.map((item) => ({
+            variantId: item.variant?.id,
             id: item.product.id,
-            name: item.product.name,
-            detail: item.selectedOption?.size || item.notes,
+            detail: item.variant?.label || item.selectedOption?.size || item.notes,
             qty: item.quantity,
           })),
-          customerName,
-          customerPhone,
+          customerName: name,
+          customerPhone: phone,
           deliveryType,
-          deliveryAddress,
+          deliveryAddress: address,
+          addressReference: reference,
+          region,
           paymentMethod: METHOD_LABEL[method],
-          notes: orderNotes,
+          notes,
           couponCode,
+          currency: quote?.currency.code || currency?.code,
+          shippingMethodId,
         }),
       });
       const data = await res.json().catch(() => ({}));
+
       if (!res.ok || !data?.ok) {
-        // Errores de negocio (stock, cupón, producto no disponible) sí detienen la compra.
-        // Si la tienda está sin base de datos, seguimos con el pedido por WhatsApp
-        // para no perder la venta (el dueño recibe el aviso por correo).
         const businessError = res.status === 400 || res.status === 409;
         if (businessError) {
-          setPayError(data?.error || 'No pudimos registrar tu pedido. Intenta de nuevo.');
+          setPayError(data?.error || 'No pudimos registrar tu pedido.');
+          setPlacing(false);
           return;
         }
         setPayError('Guardando pedido en modo WhatsApp…');
       }
+
       finalNumber = data.order?.order_number || draftNumber;
       finalTotal = Number(data.total) || totalToPay;
       stamps = typeof data.stamps === 'number' ? data.stamps : null;
       completed = Boolean(data.completed);
+
       if (Array.isArray(data.order?.items)) {
         serverItems = data.order.items.map((i: { name: string; detail?: string; qty: number; price: number }) => ({
           name: i.name,
@@ -209,33 +363,36 @@ export default function CheckoutPayment({
         }));
       }
     } catch {
-      // Sin conexión con la tienda: el pedido sigue por WhatsApp igualmente.
       setPayError('Sin conexión con la tienda. Tu pedido se enviará por WhatsApp.');
     }
+
+    // Pasarela externa (si está configurada)
+    if (method === 'card' && MERCADOPAGO_LINK) window.open(MERCADOPAGO_LINK, '_blank');
+    if (method === 'deuna' && DEUNA_LINK) window.open(DEUNA_LINK, '_blank');
 
     const order: OrderData = {
       number: finalNumber,
       timestamp: Date.now(),
-      customerName,
-      customerPhone,
+      customerName: name,
+      customerPhone: phone,
       deliveryType,
-      deliveryAddress,
+      deliveryAddress: [address, reference].filter(Boolean).join(' · '),
       paymentMethod: METHOD_LABEL[method],
       items:
         serverItems ||
         cart.map((item) => ({
           name: item.product.name,
-          detail: item.selectedOption?.size || item.notes,
+          detail: item.variant?.label || item.selectedOption?.size || item.notes,
           qty: item.quantity,
-          price: item.selectedOption ? item.selectedOption.price : item.product.price,
+          price: item.variant?.price ?? item.selectedOption?.price ?? item.product.price,
         })),
-      notes: orderNotes,
+      notes,
       total: finalTotal,
     };
 
-    openWhatsApp(buildMessage(extra));
+    openWhatsApp();
     onOrderComplete(order, { stamps, completed });
-    // Aviso por correo al dueño (no bloquea ni rompe el flujo si falla)
+
     try {
       fetch('/api/pedido-email', {
         method: 'POST',
@@ -251,291 +408,282 @@ export default function CheckoutPayment({
           notes: order.notes,
           total: order.total,
           couponCode,
-          discount: discountValue,
+          discount: displayDiscount,
         }),
       }).catch(() => {});
     } catch {
-      // ignorar: el pedido ya salió por WhatsApp
+      // el pedido ya salió por WhatsApp
     }
+
+    setPlacing(false);
   };
 
-  const copyField = async (key: string, value: string) => {
-    try {
-      await navigator.clipboard.writeText(value);
-    } catch {
-      // ignorar
-    }
+  const copy = (text: string, key: string) => {
+    navigator.clipboard?.writeText(text);
     setCopied(key);
-    setTimeout(() => setCopied(null), 2000);
+    setTimeout(() => setCopied(null), 1500);
   };
 
-  const handleCardPay = async () => {    setPayError('');
-    // Plan A: link de pago fijo configurado por el dueño
-    if (MERCADOPAGO_LINK) {
-      window.open(MERCADOPAGO_LINK, '_blank');
-      return;
-    }
-    // Plan B: crear preferencia dinámica en el servidor
-    setPaying(true);
-    try {
-      const res = await fetch('/api/pagos', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          items: cart.map((item) => ({
-            title: item.selectedOption
-              ? `${item.product.name} (${item.selectedOption.size})`
-              : item.product.name,
-            quantity: item.quantity,
-            unit_price: item.selectedOption ? item.selectedOption.price : item.product.price,
-          })),
-          total: Number(totalToPay.toFixed(2)),
-          customerName,
-          customerPhone,
-          deliveryType,
-          deliveryAddress,
-          orderNotes,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.init_point) {
-        if (data?.error === 'NOT_CONFIGURED') {
-          setPayError(
-            'El pago con tarjeta aún no está activado. Completa tu pedido por WhatsApp y coordinamos el pago. 🙏'
-          );
-        } else {
-          setPayError('No se pudo iniciar el pago. Intenta de nuevo o usa otro método.');
-        }
-        return;
-      }
-      window.location.href = data.init_point;
-    } catch {
-      setPayError('Error de conexión. Revisa tu internet o usa otro método de pago.');
-    } finally {
-      setPaying(false);
-    }
-  };
-
-  // Pago con tarjeta vía Kushki (link rápido o cobro integrado)
-  const handleKushkiPay = async () => {
-    setPayError('');
-    if (KUSHKI_PAYMENT_LINK) {
-      window.open(KUSHKI_PAYMENT_LINK, '_blank');
-      return;
-    }
-    if (!KUSHKI_PUBLIC_KEY) {
-      setPayError('El pago con Kushki aún no está activado. Completa tu pedido por WhatsApp y coordinamos el pago. 🙏');
-      return;
-    }
-    const num = cardNumber.replace(/\D/g, '');
-    if (cardName.trim().length < 3) {
-      setPayError('Escribe el nombre que aparece en la tarjeta.');
-      return;
-    }
-    if (num.length < 13 || num.length > 19) {
-      setPayError('El número de tarjeta no es válido.');
-      return;
-    }
-    if (!/^(0[1-9]|1[0-2])$/.test(cardExpMM)) {
-      setPayError('Mes de vencimiento inválido (01 a 12).');
-      return;
-    }
-    if (!/^\d{2}$/.test(cardExpYY)) {
-      setPayError('Año de vencimiento inválido (2 dígitos, Ej. 28).');
-      return;
-    }
-    if (!/^\d{3,4}$/.test(cardCvc)) {
-      setPayError('Código de seguridad inválido.');
-      return;
-    }
-    setPaying(true);
-    try {
-      await loadKushkiScript();
-      const kushki = getKushki(KUSHKI_PUBLIC_KEY);
-      if (!kushki) throw new Error('init');
-      const token: string = await new Promise((resolve, reject) => {
-        kushki.requestToken(
-          {
-            amount: Number(totalToPay.toFixed(2)),
-            currency: 'USD',
-            card: {
-              name: cardName.trim(),
-              number: num,
-              cvc: cardCvc,
-              expiryMonth: cardExpMM,
-              expiryYear: cardExpYY,
-            },
-          },
-          (res) => (res.token ? resolve(res.token) : reject(new Error(res.message || 'token')))
-        );
-      });
-      const r = await fetch('/api/pagos/kushki', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, amount: Number(totalToPay.toFixed(2)) }),
-      });
-      const d = await r.json().catch(() => ({}));
-      if (!r.ok || !d.approved) {
-        setPayError(d?.message || 'La tarjeta fue rechazada. Verifica los datos o usa otro método.');
-        return;
-      }
-      completeOrder(`✅ Pago aprobado con tarjeta vía Kushki${d.ticket ? ` (Ticket ${d.ticket})` : ''}.`);
-    } catch {
-      setPayError('No se pudo procesar la tarjeta. Revisa los datos o usa otro método.');
-    } finally {
-      setPaying(false);
-    }
-  };
-
-  const cardInputCls =
-    'w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-orange-500';
+  const input =
+    'w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-3 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-orange-500 transition-colors';
+  const label = 'text-[11px] font-bold text-zinc-400 uppercase tracking-wider block mb-1.5';
+  const errorText = 'text-[11px] font-semibold text-red-400 mt-1';
 
   return (
-    <div className="space-y-4">
-      <button
-        type="button"
-        onClick={onBack}
-        className="flex items-center gap-1.5 text-xs font-bold text-zinc-400 hover:text-white transition-colors"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        <span>Volver al pedido</span>
-      </button>
-
+    <div className="space-y-5">
+      {/* Progreso del embudo */}
       <div>
-        <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider block mb-2">
-          1. Elige cómo pagar:
-        </label>
-        <div className="grid grid-cols-3 gap-2">
-          {PAYMENT_METHODS.map((m) => (
-            <button
-              key={m.id}
-              type="button"
-              onClick={() => {
-                setMethod(m.id);
-                setPayError('');
-              }}
-              className={`flex flex-col items-center gap-1 p-3 rounded-xl border text-center transition-all ${
-                method === m.id
-                  ? 'bg-orange-600/20 border-orange-500 shadow-[0_0_15px_rgba(255,85,0,0.25)]'
-                  : 'bg-zinc-900 border-zinc-800 hover:border-zinc-700'
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">
+            Paso {step} de 4
+          </span>
+          <button onClick={back} className="flex items-center gap-1 text-[11px] font-bold text-zinc-400 hover:text-white">
+            <ArrowLeft className="w-3.5 h-3.5" /> {step === 1 ? 'Volver al carrito' : 'Atrás'}
+          </button>
+        </div>
+        <div className="flex gap-1.5">
+          {STEPS.map((s) => (
+            <div
+              key={s.id}
+              className={`flex-1 flex flex-col items-center gap-1 rounded-lg py-1.5 text-[10px] font-black uppercase tracking-wide transition-colors ${
+                step === s.id
+                  ? 'bg-amber-500 text-zinc-950'
+                  : step > s.id
+                  ? 'bg-emerald-500/15 text-emerald-400'
+                  : 'bg-zinc-900 text-zinc-500'
               }`}
             >
-              <span className="text-2xl">{m.icon}</span>
-              <span className={`text-[11px] font-black leading-tight ${method === m.id ? 'text-amber-400' : 'text-zinc-300'}`}>
-                {m.name}
-              </span>
-            </button>
-          ))}
-        </div>
-        <p className="text-[11px] text-zinc-500 mt-1.5">
-          {PAYMENT_METHODS.find((m) => m.id === method)?.description}
-        </p>
-      </div>
-
-      {/* Panel: transferencia */}
-      {method === 'transfer' && (
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4 space-y-2">
-          <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
-            2. Transfiere ${totalToPay.toFixed(2)} a:
-          </p>
-          {[
-            { key: 'bank', label: 'Banco', value: BANK_ACCOUNT.bank },
-            { key: 'type', label: 'Tipo', value: BANK_ACCOUNT.accountType },
-            { key: 'number', label: 'Cuenta', value: BANK_ACCOUNT.accountNumber },
-            { key: 'holder', label: 'Titular', value: BANK_ACCOUNT.holder },
-          ].map((f) => (
-            <div key={f.key} className="flex items-center justify-between gap-2 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2">
-              <div className="min-w-0">
-                <p className="text-[10px] text-zinc-500 uppercase tracking-wider">{f.label}</p>
-                <p className="text-xs font-bold text-white truncate">{f.value}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => copyField(f.key, f.value)}
-                className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 shrink-0"
-                title="Copiar"
-              >
-                {copied === f.key ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-              </button>
+              {step > s.id ? <Check className="w-4 h-4" /> : s.icon}
+              <span>{s.label}</span>
             </div>
           ))}
         </div>
-      )}
+      </div>
 
-      {/* Panel: Mercado Pago */}
-      {method === 'card' && (
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
-          <div className="flex items-center gap-2 text-xs text-zinc-300">
-            <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span>Pago 100% seguro con Mercado Pago. Acepta débito, crédito y más.</span>
+      {/* PASO 1 · Datos personales */}
+      {step === 1 && (
+        <div className="space-y-3">
+          <div>
+            <label className={label}>Nombre completo *</label>
+            <input className={input} value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej. María Pérez" />
+            {stepError('customerName') && <p className={errorText}>{stepError('customerName')}</p>}
           </div>
-          {payError && (
-            <p className="mt-3 text-xs font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-xl px-3 py-2">
-              {payError}
-            </p>
-          )}
+          <div>
+            <label className={label}>Teléfono / WhatsApp *</label>
+            <input
+              className={input}
+              inputMode="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="0961290493"
+            />
+            {stepError('customerPhone') && <p className={errorText}>{stepError('customerPhone')}</p>}
+          </div>
+          <div>
+            <label className={label}>Correo (opcional)</label>
+            <input
+              className={input}
+              inputMode="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="tucorreo@ejemplo.com"
+            />
+            {stepError('email') && <p className={errorText}>{stepError('email')}</p>}
+          </div>
         </div>
       )}
 
-      {/* Panel: Kushki */}
-      {method === 'kushki' && (
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4 space-y-3">
-          <div className="flex items-center gap-2 text-xs text-zinc-300">
-            <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span>Pago 100% seguro con Kushki. Acepta débito, crédito y más.</span>
+      {/* PASO 2 · Entrega */}
+      {step === 2 && (
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => setDeliveryType('delivery')}
+              className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border text-xs font-bold transition-colors ${
+                deliveryType === 'delivery'
+                  ? 'bg-orange-500/15 border-orange-500 text-amber-400'
+                  : 'bg-zinc-900 border-zinc-800 text-zinc-400'
+              }`}
+            >
+              <Truck className="w-5 h-5" /> A domicilio
+            </button>
+            <button
+              onClick={() => setDeliveryType('pickup')}
+              className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border text-xs font-bold transition-colors ${
+                deliveryType === 'pickup'
+                  ? 'bg-orange-500/15 border-orange-500 text-amber-400'
+                  : 'bg-zinc-900 border-zinc-800 text-zinc-400'
+              }`}
+            >
+              <Store className="w-5 h-5" /> Retiro en local
+            </button>
           </div>
 
-          {!KUSHKI_PAYMENT_LINK && KUSHKI_PUBLIC_KEY && (
+          {deliveryType === 'delivery' && (
             <>
-              <input
-                type="text"
-                placeholder="Nombre en la tarjeta"
-                value={cardName}
-                onChange={(e) => setCardName(e.target.value)}
-                className={cardInputCls}
-              />
-              <input
-                type="text"
-                inputMode="numeric"
-                placeholder="Número de tarjeta"
-                value={cardNumber}
-                onChange={(e) =>
-                  setCardNumber(
-                    e.target.value.replace(/\D/g, '').slice(0, 16).replace(/(\d{4})(?=\d)/g, '$1 ')
-                  )
-                }
-                className={cardInputCls}
-              />
-              <div className="grid grid-cols-3 gap-2">
+              <div>
+                <label className={label}>Dirección *</label>
                 <input
-                  type="text"
-                  inputMode="numeric"
-                  placeholder="MM"
-                  value={cardExpMM}
-                  onChange={(e) => setCardExpMM(e.target.value.replace(/\D/g, '').slice(0, 2))}
-                  className={cardInputCls}
+                  className={input}
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="Calle, número, sector"
                 />
+                {stepError('deliveryAddress') && <p className={errorText}>{stepError('deliveryAddress')}</p>}
+              </div>
+              <div>
+                <label className={label}>Referencia</label>
                 <input
-                  type="text"
-                  inputMode="numeric"
-                  placeholder="AA"
-                  value={cardExpYY}
-                  onChange={(e) => setCardExpYY(e.target.value.replace(/\D/g, '').slice(0, 2))}
-                  className={cardInputCls}
-                />
-                <input
-                  type="password"
-                  inputMode="numeric"
-                  placeholder="CVC"
-                  value={cardCvc}
-                  onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                  className={cardInputCls}
+                  className={input}
+                  value={reference}
+                  onChange={(e) => setReference(e.target.value)}
+                  placeholder="Ej. frente al parque, casa de dos pisos"
                 />
               </div>
-              {KUSHKI_ENV !== 'production' && (
-                <p className="text-[11px] text-zinc-500">🧪 Modo pruebas: usa una tarjeta de test de Kushki.</p>
-              )}
+              <div>
+                <label className={label}>Ciudad / sector *</label>
+                <input className={input} value={region} onChange={(e) => setRegion(e.target.value)} placeholder="Tulcán" />
+                {stepError('region') && <p className={errorText}>{stepError('region')}</p>}
+              </div>
             </>
+          )}
+
+          {deliveryType === 'pickup' && (
+            <p className="text-xs text-zinc-400 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5">
+              Recoges tu pedido en <strong className="text-zinc-200">{RESTAURANT_INFO.address}</strong>
+            </p>
+          )}
+
+          <div>
+            <label className={label}>Notas del pedido</label>
+            <input className={input} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Opcional" />
+          </div>
+        </div>
+      )}
+
+      {/* PASO 3 · Envío */}
+      {step === 3 && (
+        <div className="space-y-2">
+          {quoting && <p className="text-[11px] text-zinc-500">Calculando opciones…</p>}
+
+          {deliveryType === 'pickup' ? (
+            <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-3 py-3 text-xs text-emerald-400 font-bold">
+              Retiro en local · sin costo
+            </div>
+          ) : (quote?.shippingOptions?.length ?? 0) === 0 ? (
+            <p className="text-xs text-zinc-400">No hay métodos de envío disponibles. Elige retiro en local.</p>
+          ) : (
+            quote?.shippingOptions.map((opt) => (
+              <button
+                key={opt.id}
+                onClick={() => setShippingMethodId(opt.id)}
+                className={`w-full flex items-center justify-between gap-3 p-3 rounded-xl border text-left transition-colors ${
+                  shippingMethodId === opt.id
+                    ? 'bg-orange-500/15 border-orange-500'
+                    : 'bg-zinc-900 border-zinc-800 hover:border-zinc-700'
+                }`}
+              >
+                <div>
+                  <p className="text-sm font-bold text-white">{opt.name}</p>
+                  {opt.eta && <p className="text-[11px] text-zinc-400">{opt.eta}</p>}
+                </div>
+                <span className="font-black text-amber-400">{opt.cost === 0 ? 'Gratis' : money(opt.cost)}</span>
+              </button>
+            ))
+          )}
+
+          {stepError('shippingMethodId') && <p className={errorText}>{stepError('shippingMethodId')}</p>}
+        </div>
+      )}
+
+      {/* PASO 4 · Pago + resumen */}
+      {step === 4 && (
+        <div className="space-y-4">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 space-y-1.5 text-xs">
+            {quoting && <p className="text-[11px] text-zinc-500">Actualizando totales…</p>}
+            <div className="flex justify-between text-zinc-400">
+              <span>Subtotal</span>
+              <span className="font-bold text-white">{money(displaySubtotal)}</span>
+            </div>
+            {displayDiscount > 0 && (
+              <div className="flex justify-between text-emerald-400 font-bold">
+                <span className="flex items-center gap-1">
+                  <Tag className="w-3 h-3" /> {couponCode}
+                </span>
+                <span>-{money(displayDiscount)}</span>
+              </div>
+            )}
+            {displayTax > 0 && (
+              <div className="flex justify-between text-zinc-400">
+                <span>IVA</span>
+                <span>{money(displayTax)}</span>
+              </div>
+            )}
+            <div className="flex justify-between text-zinc-400">
+              <span>Envío</span>
+              <span>{displayShipping === 0 ? 'Gratis' : money(displayShipping)}</span>
+            </div>
+            <div className="flex justify-between pt-2 border-t border-zinc-800 text-base font-black text-white">
+              <span>Total</span>
+              <span className="text-amber-400">{money(totalToPay)}</span>
+            </div>
+          </div>
+
+          {quote?.warnings?.map((w, i) => (
+            <p key={i} className="flex items-start gap-2 text-[11px] font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-xl px-3 py-2">
+              <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" /> {w}
+            </p>
+          ))}
+
+          <div className="space-y-2">
+            {PAYMENT_METHODS.map((pm) => (
+              <button
+                key={pm.id}
+                onClick={() => setMethod(pm.id)}
+                className={`w-full flex items-center justify-between gap-3 p-3 rounded-xl border text-left transition-colors ${
+                  method === pm.id
+                    ? 'bg-orange-500/15 border-orange-500'
+                    : 'bg-zinc-900 border-zinc-800 hover:border-zinc-700'
+                }`}
+              >
+                <span className="text-xs font-bold text-white">{METHOD_LABEL[pm.id]}</span>
+                {method === pm.id ? <Check className="w-4 h-4 text-amber-400" /> : <CreditCard className="w-4 h-4 text-zinc-500" />}
+              </button>
+            ))}
+          </div>
+
+          {method === 'transfer' && (
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 space-y-1.5 text-xs">
+              <p className="text-zinc-400">Transfiere a:</p>
+              <p className="font-bold text-white">{BANK_ACCOUNT.bank}</p>
+              <p className="text-zinc-300">Cuenta: {BANK_ACCOUNT.accountNumber}</p>
+              <p className="text-zinc-300">Titular: {BANK_ACCOUNT.holder}</p>
+              <button
+                onClick={() => copy(BANK_ACCOUNT.accountNumber, 'account')}
+                className="flex items-center gap-1 text-[11px] font-bold text-amber-400"
+              >
+                {copied === 'account' ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                Copiar número de cuenta
+              </button>
+            </div>
+          )}
+
+          {method === 'deuna' && (
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs space-y-2">
+              <p className="text-zinc-300">Paga con DeUna al {RESTAURANT_INFO.phone}</p>
+              {DEUNA_LINK && (
+                <a href={DEUNA_LINK} target="_blank" rel="noreferrer" className="text-amber-400 font-bold underline">
+                  Abrir enlace de pago DeUna
+                </a>
+              )}
+              {DEUNA_QR && <img src={DEUNA_QR} alt="QR DeUna" className="w-40 rounded-lg" />}
+            </div>
+          )}
+
+          {(method === 'card' || method === 'kushki') && (
+            <p className="text-[11px] text-zinc-500">
+              Al confirmar se abrirá la pasarela segura para completar el pago con tarjeta.
+            </p>
           )}
 
           {payError && (
@@ -543,96 +691,33 @@ export default function CheckoutPayment({
               {payError}
             </p>
           )}
-        </div>
-      )}
 
-      {/* Panel: DeUna */}
-      {method === 'deuna' && (
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4 space-y-3 text-center">
-          <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
-            Paga ${totalToPay.toFixed(2)} con tu app DeUna 📱
+          <button
+            onClick={completeOrder}
+            disabled={placing}
+            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-black text-sm bg-gradient-to-r from-orange-600 via-amber-500 to-orange-500 text-zinc-950 shadow-lg hover:scale-[1.01] active:scale-[0.99] disabled:opacity-60 transition-transform"
+          >
+            {placing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+            {placing ? 'ENVIANDO PEDIDO…' : `CONFIRMAR PEDIDO · ${money(totalToPay)}`}
+          </button>
+
+          <p className="flex items-center justify-center gap-1.5 text-[10px] text-zinc-500">
+            <ShieldCheck className="w-3 h-3" /> Compra protegida · Te confirmamos por WhatsApp
           </p>
-          {qrOk && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={DEUNA_QR}
-              alt="QR DeUna Moro's"
-              onError={() => setQrOk(false)}
-              className="w-40 h-40 mx-auto rounded-2xl border border-zinc-700 object-cover bg-white"
-            />
-          )}
-          {DEUNA_LINK ? (
-            <a
-              href={DEUNA_LINK}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block w-full bg-yellow-500 hover:bg-yellow-400 text-zinc-950 font-black py-3 px-4 rounded-2xl text-sm transition-all"
-            >
-              ABRIR MI LINK DEUNA
-            </a>
-          ) : (
-            <p className="text-[11px] text-zinc-500">
-              Escanea el QR del local con tu app DeUna y envíanos el comprobante 👇
-            </p>
-          )}
         </div>
       )}
 
-      {/* Botón de confirmación según método */}
-      {method === 'cash' && (
-        <button
-          type="button"
-          onClick={() => completeOrder()}
-          className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3.5 px-4 rounded-2xl flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:scale-[1.02] active:scale-95 transition-all text-sm"
-        >
-          <Send className="w-4 h-4" />
-          <span>CONFIRMAR Y PEDIR POR WHATSAPP</span>
-        </button>
-      )}
+      {errors._ && <p className={errorText}>{errors._}</p>}
 
-      {method === 'transfer' && (
+      {/* Botón continuar (pasos 1-3) */}
+      {step < 4 && (
         <button
-          type="button"
-          onClick={() => completeOrder('🧾 Ya realicé la transferencia, envío el comprobante.')}
-          className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3.5 px-4 rounded-2xl flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:scale-[1.02] active:scale-95 transition-all text-sm"
+          onClick={next}
+          disabled={validating}
+          className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-black text-sm bg-gradient-to-r from-orange-600 via-amber-500 to-orange-500 text-zinc-950 shadow-lg disabled:opacity-60"
         >
-          <Send className="w-4 h-4" />
-          <span>YA TRANSFERÍ — ENVIAR COMPROBANTE</span>
-        </button>
-      )}
-
-      {method === 'card' && (
-        <button
-          type="button"
-          onClick={handleCardPay}
-          disabled={paying}
-          className="w-full bg-gradient-to-r from-sky-600 to-blue-500 hover:from-sky-500 hover:to-blue-400 text-white font-black py-3.5 px-4 rounded-2xl flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(56,130,246,0.35)] hover:scale-[1.02] active:scale-95 transition-all text-sm disabled:opacity-60"
-        >
-          {paying ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
-          <span>{paying ? 'CONECTANDO…' : `PAGAR $${totalToPay.toFixed(2)} CON TARJETA`}</span>
-        </button>
-      )}
-
-      {method === 'kushki' && (
-        <button
-          type="button"
-          onClick={handleKushkiPay}
-          disabled={paying}
-          className="w-full bg-gradient-to-r from-violet-600 to-purple-500 hover:from-violet-500 hover:to-purple-400 text-white font-black py-3.5 px-4 rounded-2xl flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(139,92,246,0.35)] hover:scale-[1.02] active:scale-95 transition-all text-sm disabled:opacity-60"
-        >
-          {paying ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
-          <span>{paying ? 'PROCESANDO…' : `PAGAR $${totalToPay.toFixed(2)} CON KUSHKI`}</span>
-        </button>
-      )}
-
-      {method === 'deuna' && (
-        <button
-          type="button"
-          onClick={() => completeOrder('📱 Pagado con DeUna, envío el comprobante.')}
-          className="w-full bg-yellow-500 hover:bg-yellow-400 text-zinc-950 font-black py-3.5 px-4 rounded-2xl flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(234,179,8,0.3)] hover:scale-[1.02] active:scale-95 transition-all text-sm"
-        >
-          <Send className="w-4 h-4" />
-          <span>YA PAGUÉ CON DEUNA — ENVIAR COMPROBANTE</span>
+          {validating ? <Loader2 className="w-5 h-5 animate-spin" /> : <ArrowRight className="w-5 h-5" />}
+          {validating ? 'VALIDANDO…' : 'CONTINUAR'}
         </button>
       )}
     </div>

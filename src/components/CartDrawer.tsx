@@ -180,13 +180,15 @@ export default function CartDrawer() {
                 {/* List of Cart Items */}
                 <div className="space-y-3">
                   {cart.map((item) => {
-                    const price = item.selectedOption ? item.selectedOption.price : item.product.price;
+                    const price = item.variant?.price ?? (item.selectedOption ? item.selectedOption.price : item.product.price);
                     const itemTotal = price * item.quantity;
                     const optionSize = item.selectedOption?.size;
+                    const variantId = item.variant?.id;
+                    const variantlabel = item.variant?.label;
 
                     return (
                       <div
-                        key={`${item.product.id}-${optionSize || ''}`}
+                        key={`${item.product.id}-${variantId || optionSize || ''}`}
                         className="flex gap-3 bg-zinc-900/80 border border-zinc-800/80 p-3 rounded-2xl relative group"
                       >
                         <div className="relative w-16 h-16 rounded-xl overflow-hidden bg-zinc-950 shrink-0">
@@ -204,7 +206,7 @@ export default function CartDrawer() {
                               {item.product.name}
                             </h4>
                             <button
-                              onClick={() => removeFromCart(item.product.id, optionSize)}
+                              onClick={() => removeFromCart(item.product.id, optionSize, variantId)}
                               className="text-zinc-500 hover:text-red-400 p-1"
                               title="Eliminar"
                             >
@@ -212,9 +214,9 @@ export default function CartDrawer() {
                             </button>
                           </div>
 
-                          {optionSize && (
+                          {(variantlabel || optionSize) && (
                             <span className="text-[10px] text-amber-400 font-semibold block">
-                              Tamaño: {optionSize}
+                              {variantlabel || `Tamaño: ${optionSize}`}
                             </span>
                           )}
 
@@ -232,14 +234,14 @@ export default function CartDrawer() {
                             {/* Quantity Controls */}
                             <div className="flex items-center gap-2 bg-zinc-950 border border-zinc-800 rounded-lg p-0.5">
                               <button
-                                onClick={() => updateQuantity(item.product.id, item.quantity - 1, optionSize)}
+                                onClick={() => updateQuantity(item.product.id, item.quantity - 1, optionSize, variantId)}
                                 className="p-1 text-zinc-400 hover:text-white"
                               >
                                 <Minus className="w-3 h-3" />
                               </button>
                               <span className="text-xs font-bold text-white px-1">{item.quantity}</span>
                               <button
-                                onClick={() => updateQuantity(item.product.id, item.quantity + 1, optionSize)}
+                                onClick={() => updateQuantity(item.product.id, item.quantity + 1, optionSize, variantId)}
                                 className="p-1 text-zinc-400 hover:text-white"
                               >
                                 <Plus className="w-3 h-3" />

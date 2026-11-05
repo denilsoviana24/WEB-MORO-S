@@ -45,8 +45,32 @@ export async function POST(req: Request) {
   const { data, error } = await guard.svc
     .from('products')
     .upsert(rows, { onConflict: 'slug' })
-    .select('id');
+    .select('id,sku,price,sale_price,stock');
 
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+
+  // Variante por defecto para cada producto (el inventario vive en las variantes).
+  try {
+    const { data: existing } = await guard.svc.from('product_variants').select('product_id');
+    const withVariant = new Set((existing || []).map((v) => v.product_id));
+    const missing = (data || [])
+      .filter((p) => !withVariant.has(p.id))
+      .map((p) => ({
+        product_id: p.id,
+        sku: p.sku || `MOR-${String(p.id).slice(0, 8).toUpperCase()}`,
+        title: 'Único',
+        attributes: {},
+        price: Number(p.price) || 0,
+        sale_price: p.sale_price === null ? null : Number(p.sale_price),
+        stock: Number(p.stock) || 0,
+        manage_stock: p.stock !== null && p.stock !== undefined,
+        active: true,
+      }));
+
+    if (missing.length) await guard.svc.from('product_variants').insert(missing);
+  } catch {
+    // Si la migración de catálogo aún no se ejecutó, el menú igual queda importado.
+  }
+
   return NextResponse.json({ ok: true, imported: data?.length ?? rows.length });
 }
