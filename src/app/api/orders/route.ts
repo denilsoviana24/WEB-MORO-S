@@ -323,6 +323,10 @@ export async function POST(req: Request) {
 
   const reservations: string[] = [];
   for (const line of lines) {
+    const variant = variantMap.get(line.variantId);
+    // Los productos sin control de inventario no reservan unidades.
+    if (!variant || !variant.manage_stock) continue;
+
     const { data: resId, error: resError } = await svc.rpc('reserve_stock', {
       p_variant: line.variantId,
       p_qty: line.qty,
