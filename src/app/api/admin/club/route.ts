@@ -126,6 +126,70 @@ export async function GET(req: Request) {
     };
   });
 
+  /* Compras sin cuenta: se agrupan por teléfono (o nombre si no hay). */
+  const guestMap = new Map<
+    string,
+    {
+      key: string;
+      name: string;
+      phone: string;
+      orders: number;
+      spent: number;
+      couponsUsed: number;
+      discountSaved: number;
+      firstOrderAt: string;
+      lastOrderAt: string;
+      lastTotal: number;
+      coupons: string[];
+    }
+  >();
+
+  for (const order of orders) {
+    if (order.user_id && profiles.some((p) => p.id === order.user_id)) continue;
+    if (order.status === 'cancelled') continue;
+
+    const phone = String(order.customer_phone || '').replace(/[^0-9]/g, '');
+    const name = String(order.customer_name || '').trim() || 'Cliente';
+    const key = phone || `n:${name.toLowerCase()}`;
+
+    const prev = guestMap.get(key);
+    if (prev) {
+      prev.orders += 1;
+      prev.spent += Number(order.total || 0);
+      prev.discountSaved += Number(order.discount || 0);
+      if (order.coupon_code) {
+        prev.couponsUsed += 1;
+        if (!prev.coupons.includes(order.coupon_code)) prev.coupons.push(order.coupon_code);
+      }
+      if (new Date(order.created_at).getTime() > new Date(prev.lastOrderAt).getTime()) {
+        prev.lastOrderAt = order.created_at;
+        prev.lastTotal = Number(order.total || 0);
+      }
+    } else {
+      guestMap.set(key, {
+        key,
+        name,
+        phone: order.customer_phone || '',
+        orders: 1,
+        spent: Number(order.total || 0),
+        couponsUsed: order.coupon_code ? 1 : 0,
+        discountSaved: Number(order.discount || 0),
+        firstOrderAt: order.created_at,
+        lastOrderAt: order.created_at,
+        lastTotal: Number(order.total || 0),
+        coupons: order.coupon_code ? [order.coupon_code] : [],
+      });
+    }
+  }
+
+  const guests = [...guestMap.values()]
+    .map((g) => ({
+      ...g,
+      spent: Math.round(g.spent * 100) / 100,
+      discountSaved: Math.round(g.discountSaved * 100) / 100,
+    }))
+    .sort((a, b) => new Date(b.lastOrderAt).getTime() - new Date(a.lastOrderAt).getTime());
+
   const couponUses = orders
     .filter((o) => o.coupon_code && o.status !== 'cancelled')
     .slice(0, 150)
@@ -139,6 +203,7 @@ export async function GET(req: Request) {
         phone: o.customer_phone || '',
         discount: Number(o.discount || 0),
         total: Number(o.total || 0),
+        guest: !member,
         createdAt: o.created_at,
       };
     });
@@ -149,6 +214,7 @@ export async function GET(req: Request) {
   return NextResponse.json(
     {
       members,
+      guests,
       couponUses,
       redemptions: redemptions.map((r) => ({
         ...r,
@@ -163,6 +229,10 @@ export async function GET(req: Request) {
         couponsUsed: couponUses.length,
         discountGiven: Math.round(couponUses.reduce((s, c) => s + c.discount, 0) * 100) / 100,
         membersWithOrders: members.filter((m) => m.orders > 0).length,
+        guests: guests.length,
+        guestOrders: guests.reduce((s, g) => s + g.orders, 0),
+        guestSpent: Math.round(guests.reduce((s, g) => s + g.spent, 0) * 100) / 100,
+        totalOrders: orders.filter((o) => o.status !== 'cancelled').length,
       },
     },
     { headers: NO_STORE }

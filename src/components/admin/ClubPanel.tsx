@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { RefreshCw, Search, Users, Gift, Ticket, Percent, ChevronDown, Star } from 'lucide-react';
+import { RefreshCw, Search, Users, Gift, Ticket, Percent, ChevronDown, Star, UserRound, ShoppingBag } from 'lucide-react';
 import { adminFetch, money, shortDate } from '@/lib/adminClient';
+import { STAMPS_GOAL } from '@/data/loyaltyData';
 
 interface Member {
   id: string;
@@ -30,7 +31,22 @@ interface CouponUse {
   phone: string;
   discount: number;
   total: number;
+  guest?: boolean;
   createdAt: string;
+}
+
+interface Guest {
+  key: string;
+  name: string;
+  phone: string;
+  orders: number;
+  spent: number;
+  couponsUsed: number;
+  discountSaved: number;
+  firstOrderAt: string;
+  lastOrderAt: string;
+  lastTotal: number;
+  coupons: string[];
 }
 
 interface Redemption {
@@ -51,6 +67,10 @@ interface Stats {
   couponsUsed: number;
   discountGiven: number;
   membersWithOrders: number;
+  guests?: number;
+  guestOrders?: number;
+  guestSpent?: number;
+  totalOrders?: number;
 }
 
 const TIER_STYLE: Record<string, string> = {
@@ -62,6 +82,7 @@ const TIER_STYLE: Record<string, string> = {
 
 export default function ClubPanel() {
   const [members, setMembers] = useState<Member[]>([]);
+  const [guests, setGuests] = useState<Guest[]>([]);
   const [couponUses, setCouponUses] = useState<CouponUse[]>([]);
   const [redemptions, setRedemptions] = useState<Redemption[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
@@ -77,11 +98,13 @@ export default function ClubPanel() {
     try {
       const data = await adminFetch<{
         members: Member[];
+        guests: Guest[];
         couponUses: CouponUse[];
         redemptions: Redemption[];
         stats: Stats;
       }>('/api/admin/club');
       setMembers(data.members);
+      setGuests(data.guests || []);
       setCouponUses(data.couponUses);
       setRedemptions(data.redemptions);
       setStats(data.stats);
@@ -106,6 +129,14 @@ export default function ClubPanel() {
     });
   }, [members, q, tier]);
 
+  const filteredGuests = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    if (!term) return guests;
+    return guests.filter(
+      (g) => g.name.toLowerCase().includes(term) || g.phone.replace(/[^0-9]/g, '').includes(term.replace(/[^0-9]/g, ''))
+    );
+  }, [guests, q]);
+
   if (loading) return <p className="text-sm text-zinc-400">Cargando Club Moro&apos;s…</p>;
 
   const cards = stats
@@ -116,6 +147,8 @@ export default function ClubPanel() {
         { label: 'Premios canjeados', value: stats.rewardsRedeemed, icon: <Gift className="w-4 h-4" />, tint: 'text-violet-400' },
         { label: 'Cupones usados', value: stats.couponsUsed, icon: <Percent className="w-4 h-4" />, tint: 'text-orange-400' },
         { label: 'Descuentos otorgados', value: money(stats.discountGiven), icon: <Percent className="w-4 h-4" />, tint: 'text-red-400' },
+        { label: 'Pedidos totales', value: stats.totalOrders ?? 0, icon: <ShoppingBag className="w-4 h-4" />, tint: 'text-teal-400' },
+        { label: 'Compras sin cuenta', value: stats.guestOrders ?? 0, icon: <UserRound className="w-4 h-4" />, tint: 'text-fuchsia-400' },
       ]
     : [];
 
@@ -140,7 +173,7 @@ export default function ClubPanel() {
         <p className="text-xs font-bold text-red-400 bg-red-500/10 border border-red-500/30 rounded-xl px-3 py-2">{error}</p>
       )}
 
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {cards.map((c) => (
           <div key={c.label} className="bg-zinc-900/70 border border-zinc-800 rounded-2xl p-3">
             <div className={`${c.tint} mb-1.5`}>{c.icon}</div>
@@ -184,7 +217,7 @@ export default function ClubPanel() {
         <div className="space-y-2">
           {filtered.map((m) => {
             const isOpen = open === m.id;
-            const pct = Math.min(100, (m.stamps / 20) * 100);
+            const pct = Math.min(100, (m.stamps / STAMPS_GOAL) * 100);
             return (
               <div key={m.id} className="bg-zinc-900/70 border border-zinc-800 rounded-2xl overflow-hidden">
                 <div className="p-3 flex flex-wrap items-center gap-3">
@@ -207,7 +240,7 @@ export default function ClubPanel() {
                   <div className="min-w-[140px]">
                     <div className="flex items-center justify-between text-[10px] text-zinc-400 mb-1">
                       <span>Tarjeta</span>
-                      <span className="font-black text-amber-400">{m.stamps}/20</span>
+                      <span className="font-black text-amber-400">{m.stamps}/{STAMPS_GOAL}</span>
                     </div>
                     <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
                       <div className="h-full bg-gradient-to-r from-orange-500 to-amber-400" style={{ width: `${pct}%` }} />
@@ -301,6 +334,44 @@ export default function ClubPanel() {
           })}
         </div>
       )}
+
+      {/* Clientes sin cuenta */}
+      <div className="bg-zinc-900/70 border border-zinc-800 rounded-2xl p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <h3 className="font-black text-white text-sm flex items-center gap-2">
+            <UserRound className="w-4 h-4 text-fuchsia-400" /> Clientes sin cuenta ({filteredGuests.length})
+          </h3>
+          <p className="text-[10px] text-zinc-500">
+            Compras hechas por WhatsApp sin registrarse · {money(stats?.guestSpent ?? 0)} en ventas
+          </p>
+        </div>
+
+        {filteredGuests.length === 0 ? (
+          <p className="text-xs text-zinc-500">Todavía no hay compras de invitados.</p>
+        ) : (
+          <div className="space-y-1.5 max-h-72 overflow-y-auto">
+            {filteredGuests.map((g) => (
+              <div
+                key={g.key}
+                className="flex flex-wrap items-center gap-x-3 gap-y-1 bg-zinc-950/60 border border-zinc-800 rounded-xl px-3 py-2 text-[11px]"
+              >
+                <span className="font-black text-white min-w-[120px]">{g.name}</span>
+                <span className="text-zinc-400">{g.phone || 'sin teléfono'}</span>
+                <span className="text-zinc-500">
+                  {g.orders} pedido{g.orders === 1 ? '' : 's'}
+                </span>
+                <span className="font-bold text-amber-400">{money(g.spent)}</span>
+                {g.couponsUsed > 0 && (
+                  <span className="text-emerald-400 font-bold">
+                    {g.coupons.join(', ')} · {g.couponsUsed} uso{g.couponsUsed === 1 ? '' : 's'}
+                  </span>
+                )}
+                <span className="ml-auto text-zinc-500">Último: {shortDate(g.lastOrderAt)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Promociones usadas */}
       <div className="grid lg:grid-cols-2 gap-4">
