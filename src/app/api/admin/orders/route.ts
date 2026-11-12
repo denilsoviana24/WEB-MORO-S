@@ -5,14 +5,16 @@ import { ORDER_STATUSES, type OrderStatus } from '@/lib/shop';
 /**
  * Admin · Pedidos.
  * - Lista con filtro por estado.
- * - Cambia estado y mueve el inventario correctamente:
- *   reservado → confirmado (descuenta stock físico)
+ * - Cambia estado y mueve el inventario correctamente, incluidos los combos:
+ *   reservado → confirmado (descuenta stock físico de cada componente)
  *   cancelado → libera reserva o devuelve stock si ya se había descontado
  */
 const VALID = ORDER_STATUSES.map((s) => s.id);
 
 interface OrderItem {
   variantId?: string;
+  comboId?: string;
+  components?: { variantId: string; qty: number }[];
   id?: string;
   qty?: number;
 }
@@ -63,6 +65,30 @@ export async function PATCH(req: Request) {
   const items = (Array.isArray(current.items) ? current.items : []) as OrderItem[];
   const stockState: string = current.stock_state || 'reserved';
 
+  /** Ajusta stock de una línea (producto simple o combo). */
+  const moveStock = async (item: OrderItem, sign: 1 | -1) => {
+    const reason = sign < 0 ? 'sale' : 'cancel';
+
+    if (item.components?.length) {
+      for (const c of item.components) {
+        if (!c.variantId) continue;
+        await guard.svc.rpc('adjust_stock', {
+          p_variant: c.variantId,
+          p_delta: sign * (Number(c.qty) || 1),
+          p_reason: reason,
+        });
+      }
+      return;
+    }
+
+    const qty = Number(item.qty) || 1;
+    if (item.variantId) {
+      await guard.svc.rpc('adjust_stock', { p_variant: item.variantId, p_delta: sign * qty, p_reason: reason });
+    } else if (item.id) {
+      await guard.svc.rpc('restore_stock', { p_id: item.id, p_qty: sign * qty });
+    }
+  };
+
   let nextStockState = stockState;
 
   // 1) Confirmar: la reserva se convierte en salida real de inventario
@@ -79,11 +105,7 @@ export async function PATCH(req: Request) {
 
     // Pedidos antiguos (sin reservas): descuenta directo
     if (!reservations || reservations.length === 0) {
-      for (const item of items) {
-        if (item.variantId) {
-          await guard.svc.rpc('adjust_stock', { p_variant: item.variantId, p_delta: -(Number(item.qty) || 1), p_reason: 'sale' });
-        }
-      }
+      for (const item of items) await moveStock(item, -1);
     }
     nextStockState = 'committed';
   }
@@ -100,24 +122,12 @@ export async function PATCH(req: Request) {
       for (const r of reservations || []) {
         await guard.svc.rpc('release_reservation', { p_reservation: r.id });
       }
-      // Pedido antiguo sin reserva registrada
+
       if (!reservations || reservations.length === 0) {
-        for (const item of items) {
-          if (item.variantId) {
-            await guard.svc.rpc('adjust_stock', { p_variant: item.variantId, p_delta: Number(item.qty) || 1, p_reason: 'cancel' });
-          } else if (item.id) {
-            await guard.svc.rpc('restore_stock', { p_id: item.id, p_qty: Number(item.qty) || 1 });
-          }
-        }
+        for (const item of items) await moveStock(item, 1);
       }
     } else if (stockState === 'committed') {
-      for (const item of items) {
-        if (item.variantId) {
-          await guard.svc.rpc('adjust_stock', { p_variant: item.variantId, p_delta: Number(item.qty) || 1, p_reason: 'cancel' });
-        } else if (item.id) {
-          await guard.svc.rpc('restore_stock', { p_id: item.id, p_qty: Number(item.qty) || 1 });
-        }
-      }
+      for (const item of items) await moveStock(item, 1);
     }
     nextStockState = 'released';
   }

@@ -1,17 +1,17 @@
 import { NextResponse } from 'next/server';
 import { serviceClient } from '@/lib/adminAuth';
+import { computeDiscount, couponProblem, type Coupon } from '@/lib/shop';
 import {
-  computeDiscount,
-  couponProblem,
-  type Coupon,
-} from '@/lib/shop';
-import {
+  available,
+  comboAvailable,
+  comboIsLive,
+  comboPrice,
   lineTotals,
   roundMoney,
   taxRateFor,
   variantPrice,
-  available,
   convert,
+  type Combo,
   type Currency,
   type RoundingMode,
   type StoreSettings,
@@ -21,11 +21,17 @@ import {
 
 /**
  * POST /api/checkout/quote
- * Totales dinámicos por AJAX: impuestos, envío y cupón.
+ * Totales dinámicos por AJAX: impuestos, envío, cupón y combos.
  * Nunca confía en los precios del navegador: recalcula todo.
  */
+interface IncomingItem {
+  variantId?: string;
+  comboId?: string;
+  qty?: number;
+}
+
 interface Incoming {
-  items?: { variantId?: string; qty?: number }[];
+  items?: IncomingItem[];
   shippingMethodId?: string | null;
   deliveryType?: 'pickup' | 'delivery';
   region?: string;
@@ -57,41 +63,121 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: 'Solicitud inválida.' }, { status: 400 });
   }
 
-  const rows = (body.items || []).filter((i) => i.variantId && Number(i.qty) > 0);
+  const rows = (body.items || []).filter((i) => (i.variantId || i.comboId) && Number(i.qty) > 0);
   if (!rows.length) return NextResponse.json({ ok: false, error: 'Carrito vacío.' }, { status: 400 });
 
-  const ids = rows.map((r) => String(r.variantId));
-  const [{ data: variants }, { data: settingsRow }, { data: taxes }, { data: currencies }, { data: methods }, { data: zones }] =
+  const variantIds = rows.map((r) => r.variantId).filter(Boolean) as string[];
+  const comboIds = rows.map((r) => r.comboId).filter(Boolean) as string[];
+
+  const [{ data: variants }, { data: settingsRow }, { data: taxes }, { data: currencies }, { data: methods }, { data: zones }, { data: comboRows }] =
     await Promise.all([
-      svc.from('product_variants').select('*').in('id', ids),
+      variantIds.length ? svc.from('product_variants').select('*').in('id', variantIds) : Promise.resolve({ data: [] }),
       svc.from('store_settings').select('*').eq('id', 1).maybeSingle(),
       svc.from('tax_rates').select('*').eq('active', true),
       svc.from('currencies').select('*').eq('active', true),
       svc.from('shipping_methods').select('*').eq('active', true).order('sort_order'),
       svc.from('shipping_zones').select('*').eq('active', true),
+      comboIds.length ? svc.from('combos').select('*').in('id', comboIds) : Promise.resolve({ data: [] }),
     ]);
 
   const settings: StoreSettings = { ...SETTINGS_DEFAULT, ...(settingsRow || {}) };
   const taxList = (taxes || []) as TaxRate[];
-  const variantMap = new Map<string, Variant>((variants || []).map((v) => [v.id, v as Variant]));
-  const productIds = [...new Set((variants || []).map((v) => v.product_id))];
+  const mode = settings.rounding_mode as RoundingMode;
+  const comboList = (comboRows || []) as Combo[];
+  const comboIdsLive = comboList.filter((c) => comboIsLive(c)).map((c) => c.id);
+
+  const { data: comboItems } = comboIdsLive.length
+    ? await svc.from('combo_items').select('*').in('combo_id', comboIdsLive)
+    : { data: [] };
+
+  const allVariantIds = [
+    ...new Set([...variantIds, ...(comboItems || []).map((i) => i.variant_id as string)]),
+  ];
+
+  const { data: allVariants } = allVariantIds.length
+    ? await svc.from('product_variants').select('*').in('id', allVariantIds)
+    : { data: [] as Variant[] };
+
+  const variantMap = new Map<string, Variant>((allVariants || []).map((v) => [v.id, v as Variant]));
+  const productIds = [...new Set([...variantMap.values()].map((v) => v.product_id))];
   const { data: products } = productIds.length
-    ? await svc.from('products').select('id,name,tax_rate_id,active').in('id', productIds)
-    : { data: [] as { id: string; name: string; tax_rate_id: string | null; active: boolean }[] };
+    ? await svc.from('products').select('id,name,tax_rate_id,active,image').in('id', productIds)
+    : { data: [] };
   const productMap = new Map((products || []).map((p) => [p.id, p]));
 
   const currencyCode = body.currency || settings.base_currency;
   const currency = ((currencies || []) as Currency[]).find((c) => c.code === currencyCode) || null;
-  const mode = settings.rounding_mode as RoundingMode;
 
-  const lines = [];
+  const lines: Record<string, unknown>[] = [];
   let subtotal = 0;
   let taxTotal = 0;
   let itemsQty = 0;
-  let weight = 0;
   const warnings: string[] = [];
 
   for (const row of rows) {
+    const qty = Math.max(1, Math.floor(Number(row.qty) || 1));
+
+    /* --- Combo --- */
+    if (row.comboId) {
+      const combo = comboList.find((c) => c.id === row.comboId);
+      if (!combo || !comboIsLive(combo)) {
+        warnings.push('Un combo de tu carrito ya no está disponible.');
+        continue;
+      }
+
+      const own = (comboItems || []).filter((i) => i.combo_id === combo.id);
+      const components = own.map((i) => {
+        const v = variantMap.get(i.variant_id);
+        const p = v ? productMap.get(v.product_id) : undefined;
+        const free = v
+          ? available({
+              manage: v.manage_stock,
+              stock: Number(v.stock) || 0,
+              reserved: Number(v.reserved) || 0,
+              backorders: v.backorders,
+            })
+          : 0;
+        return {
+          variantId: i.variant_id as string,
+          qty: Number(i.qty) || 1,
+          price: v ? variantPrice(v) : 0,
+          name: p?.name || 'Producto',
+          available: free,
+        };
+      });
+
+      const totals = comboPrice(components, Number(combo.discount_percent) || 0, combo.fixed_price === null ? null : Number(combo.fixed_price));
+      const free = comboAvailable(components.map((c) => ({ available: c.available, qty: c.qty })));
+      if (free !== Infinity && free < qty) {
+        warnings.push(free <= 0 ? `El combo "${combo.name}" está agotado.` : `Solo quedan ${free} del combo "${combo.name}".`);
+      }
+
+      const rate = taxRateFor(null, taxList, settings);
+      const lt = lineTotals({ price: totals.price, qty, taxRate: rate }, settings.prices_include_tax, mode, settings.rounding_step);
+
+      subtotal = roundMoney(subtotal + lt.net, mode, settings.rounding_step);
+      taxTotal = roundMoney(taxTotal + lt.tax, mode, settings.rounding_step);
+      itemsQty += qty;
+
+      lines.push({
+        comboId: combo.id,
+        name: combo.name,
+        variant: `${components.length} productos`,
+        sku: null,
+        qty,
+        unitPrice: roundMoney(convert(totals.price, currency), mode, settings.rounding_step),
+        regular: roundMoney(convert(totals.regular, currency), mode, settings.rounding_step),
+        percent: totals.percent,
+        taxRate: rate,
+        net: roundMoney(convert(lt.net, currency), mode, settings.rounding_step),
+        tax: roundMoney(convert(lt.tax, currency), mode, settings.rounding_step),
+        available: free === Infinity ? null : free,
+        components: components.map((c) => ({ variantId: c.variantId, qty: c.qty, name: c.name })),
+      });
+      continue;
+    }
+
+    /* --- Variante normal --- */
     const variant = variantMap.get(String(row.variantId));
     if (!variant) {
       warnings.push('Un producto de tu carrito ya no está disponible.');
@@ -103,7 +189,6 @@ export async function POST(req: Request) {
       continue;
     }
 
-    const qty = Math.max(1, Math.floor(Number(row.qty) || 1));
     const unit = variantPrice(variant);
     const rate = taxRateFor(product?.tax_rate_id, taxList, settings);
     const totals = lineTotals({ price: unit, qty, taxRate: rate }, settings.prices_include_tax, mode, settings.rounding_step);
@@ -111,7 +196,6 @@ export async function POST(req: Request) {
     subtotal = roundMoney(subtotal + totals.net, mode, settings.rounding_step);
     taxTotal = roundMoney(taxTotal + totals.tax, mode, settings.rounding_step);
     itemsQty += qty;
-    weight += Number(variant.weight || 0) * qty;
 
     const free = available({
       manage: variant.manage_stock,
@@ -139,12 +223,11 @@ export async function POST(req: Request) {
       taxRate: rate,
       net: roundMoney(convert(totals.net, currency), mode, settings.rounding_step),
       tax: roundMoney(convert(totals.tax, currency), mode, settings.rounding_step),
-      gross: roundMoney(convert(totals.gross, currency), mode, settings.rounding_step),
       available: free === Infinity ? null : free,
     });
   }
 
-  // Envío
+  /* --- Envío --- */
   const region = (body.region || '').trim().toLowerCase();
   const zoneIds = new Set(
     (zones || [])
@@ -184,7 +267,7 @@ export async function POST(req: Request) {
     shippingOptions[0] ||
     null;
 
-  // Cupón
+  /* --- Cupón --- */
   let couponDiscount = 0;
   let couponCode: string | null = null;
   let couponError: string | null = null;
@@ -200,9 +283,8 @@ export async function POST(req: Request) {
     } else {
       const coupon = couponRow as Coupon;
       const problem = couponProblem(coupon, subtotal);
-      if (problem) {
-        couponError = problem;
-      } else {
+      if (problem) couponError = problem;
+      else {
         couponDiscount = computeDiscount(coupon, subtotal);
         couponCode = coupon.code;
       }
@@ -210,10 +292,8 @@ export async function POST(req: Request) {
   }
 
   const shippingCost = chosen?.cost ?? 0;
-  const taxableBase = Math.max(0, subtotal - couponDiscount);
-  const taxRatio = subtotal > 0 ? taxableBase / subtotal : 1;
-  const finalTax = roundMoney(convert(taxTotal * (settings.prices_include_tax ? taxRatio : 1), currency), mode, settings.rounding_step);
   const totalNet = roundMoney(convert(subtotal - couponDiscount, currency), mode, settings.rounding_step);
+  const finalTax = roundMoney(convert(taxTotal, currency), mode, settings.rounding_step);
   const total = roundMoney(
     settings.prices_include_tax ? totalNet + shippingCost : totalNet + finalTax + shippingCost,
     mode,

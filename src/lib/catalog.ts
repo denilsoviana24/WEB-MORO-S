@@ -305,3 +305,84 @@ export function buildMatrix(
     [{}]
   );
 }
+
+/* ---------------------------------------------------------------- */
+/* Combos                                                           */
+/* ---------------------------------------------------------------- */
+
+export interface Combo {
+  id: string;
+  name: string;
+  slug: string | null;
+  description: string;
+  image: string;
+  discount_percent: number;
+  fixed_price: number | null;
+  badge: string | null;
+  active: boolean;
+  starts_at: string | null;
+  ends_at: string | null;
+  sort_order: number;
+}
+
+export interface ComboComponent {
+  variantId: string;
+  qty: number;
+  /** Precio unitario de la variante. */
+  price: number;
+}
+
+/** ¿El combo está vigente hoy? (activo + dentro del rango de fechas). */
+export function comboIsLive(combo: Pick<Combo, 'active' | 'starts_at' | 'ends_at'>, now = Date.now()): boolean {
+  if (!combo.active) return false;
+  if (combo.starts_at && new Date(combo.starts_at).getTime() > now) return false;
+  if (combo.ends_at && new Date(combo.ends_at).getTime() < now) return false;
+  return true;
+}
+
+export interface ComboTotals {
+  regular: number;
+  price: number;
+  saving: number;
+  percent: number;
+}
+
+/**
+ * Precio del combo: precio fijo si está definido; si no, % de descuento
+ * sobre la suma de sus componentes.
+ */
+export function comboPrice(
+  components: ComboComponent[],
+  discountPercent: number,
+  fixedPrice: number | null = null,
+  mode: RoundingMode = 'half_up',
+  step = 0.01
+): ComboTotals {
+  const regular = roundMoney(
+    components.reduce((s, c) => s + (Number(c.price) || 0) * (Number(c.qty) || 0), 0),
+    mode,
+    step
+  );
+
+  if (fixedPrice !== null && fixedPrice !== undefined && Number(fixedPrice) >= 0) {
+    const price = roundMoney(Math.min(Number(fixedPrice), regular), mode, step);
+    return { regular, price, saving: roundMoney(regular - price, mode, step), percent: regular > 0 ? Math.round((1 - price / regular) * 100) : 0 };
+  }
+
+  const pct = Math.max(0, Math.min(100, Number(discountPercent) || 0));
+  const price = roundMoney(regular * (1 - pct / 100), mode, step);
+  return { regular, price, saving: roundMoney(regular - price, mode, step), percent: pct };
+}
+
+/** Unidades de combo disponibles según el stock de cada componente. */
+export function comboAvailable(items: { available: number; qty: number }[]): number {
+  if (!items.length) return 0;
+  let min = Infinity;
+  for (const item of items) {
+    const qty = Math.max(1, Number(item.qty) || 1);
+    if (item.available === Infinity) continue;
+    min = Math.min(min, Math.floor(Math.max(0, item.available) / qty));
+  }
+  return min === Infinity ? Infinity : Math.max(0, min);
+}
+

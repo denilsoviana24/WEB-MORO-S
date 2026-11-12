@@ -152,9 +152,10 @@ export default function CheckoutPayment({
       cart
         .map((item) => ({
           variantId: item.variant?.id || variantsFor(item.product.id)[0]?.id || null,
+          comboId: item.comboId || null,
           qty: item.quantity,
         }))
-        .filter((i): i is { variantId: string; qty: number } => Boolean(i.variantId)),
+        .filter((i) => Boolean(i.variantId || i.comboId)),
     [cart, variantsFor]
   );
 
@@ -329,7 +330,8 @@ export default function CheckoutPayment({
           number: draftNumber,
           items: cart.map((item) => ({
             variantId: item.variant?.id,
-            id: item.product.id,
+            comboId: item.comboId,
+            id: item.comboId ? undefined : item.product.id,
             detail: item.variant?.label || item.selectedOption?.size || item.notes,
             qty: item.quantity,
           })),

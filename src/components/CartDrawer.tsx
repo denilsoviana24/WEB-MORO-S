@@ -48,9 +48,10 @@ export default function CartDrawer() {
     const items = cart
       .map((item) => ({
         variantId: item.variant?.id || variantsFor(item.product.id)[0]?.id,
+        comboId: item.comboId,
         qty: item.quantity,
       }))
-      .filter((i): i is { variantId: string; qty: number } => Boolean(i.variantId));
+      .filter((i) => Boolean(i.variantId || i.comboId));
 
     if (!items.length) {
       setQuote(null);

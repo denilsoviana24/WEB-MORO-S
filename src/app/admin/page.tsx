@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { LayoutDashboard, Package, ShoppingBag, Ticket, Users, Inbox, Boxes, Warehouse, SlidersHorizontal, LogIn, ShieldAlert, ArrowLeft } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingBag, Ticket, Users, Inbox, Boxes, Warehouse, SlidersHorizontal, Layers, LogIn, ShieldAlert, ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import StatsPanel from '@/components/admin/StatsPanel';
 import ProductsPanel from '@/components/admin/ProductsPanel';
@@ -13,13 +13,15 @@ import MessagesPanel from '@/components/admin/MessagesPanel';
 import CatalogPanel from '@/components/admin/CatalogPanel';
 import StockPanel from '@/components/admin/StockPanel';
 import ConfigPanel from '@/components/admin/ConfigPanel';
+import CombosPanel from '@/components/admin/CombosPanel';
 
-type Tab = 'resumen' | 'productos' | 'catalogo' | 'inventario' | 'pedidos' | 'cupones' | 'clientes' | 'mensajes' | 'config';
+type Tab = 'resumen' | 'productos' | 'catalogo' | 'combos' | 'inventario' | 'pedidos' | 'cupones' | 'clientes' | 'mensajes' | 'config';
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'resumen', label: 'Resumen', icon: <LayoutDashboard className="w-4 h-4" /> },
   { id: 'productos', label: 'Productos', icon: <Package className="w-4 h-4" /> },
   { id: 'catalogo', label: 'Catálogo', icon: <Boxes className="w-4 h-4" /> },
+  { id: 'combos', label: 'Combos', icon: <Layers className="w-4 h-4" /> },
   { id: 'inventario', label: 'Inventario', icon: <Warehouse className="w-4 h-4" /> },
   { id: 'pedidos', label: 'Pedidos', icon: <ShoppingBag className="w-4 h-4" /> },
   { id: 'cupones', label: 'Cupones', icon: <Ticket className="w-4 h-4" /> },
@@ -134,6 +136,7 @@ export default function AdminPage() {
         {tab === 'resumen' && <StatsPanel />}
         {tab === 'productos' && <ProductsPanel />}
         {tab === 'catalogo' && <CatalogPanel />}
+        {tab === 'combos' && <CombosPanel />}
         {tab === 'inventario' && <StockPanel />}
         {tab === 'pedidos' && <OrdersPanel />}
         {tab === 'cupones' && <CouponsPanel />}

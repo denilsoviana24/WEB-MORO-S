@@ -15,7 +15,21 @@ export interface CartItem {
   quantity: number;
   selectedOption?: { size: string; price: number };
   variant?: CartVariant;
+  /** Si la línea es un combo, aquí va su id. */
+  comboId?: string;
   notes?: string;
+}
+
+export interface ComboForCart {
+  id: string;
+  name: string;
+  description: string;
+  image: string;
+  price: number;
+  regular: number;
+  percent: number;
+  badge?: string | null;
+  ends_at?: string | null;
 }
 
 interface CartContextType {
@@ -27,6 +41,7 @@ interface CartContextType {
     notes?: string,
     variant?: CartVariant
   ) => void;
+  addCombo: (combo: ComboForCart) => void;
   removeFromCart: (productId: string, optionSize?: string, variantId?: string) => void;
   updateQuantity: (productId: string, quantity: number, optionSize?: string, variantId?: string) => void;
   clearCart: () => void;
@@ -95,6 +110,29 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setTimeout(() => setIsCartOpen(true), 750);
   };
 
+  const addCombo = (combo: ComboForCart) => {
+    const cartProduct: MenuItem = {
+      id: `combo:${combo.id}`,
+      name: combo.name,
+      category: 'combos',
+      description: combo.description || `${combo.percent}% de descuento`,
+      price: combo.price,
+      image: combo.image || '/images/hero.jpg',
+      badge: combo.badge || `${combo.percent}% OFF`,
+    };
+
+    setCart((prevCart) => {
+      const existingIndex = prevCart.findIndex((item) => item.comboId === combo.id);
+      if (existingIndex > -1) {
+        const next = [...prevCart];
+        next[existingIndex].quantity += 1;
+        return next;
+      }
+      return [...prevCart, { product: cartProduct, quantity: 1, comboId: combo.id }];
+    });
+    setTimeout(() => setIsCartOpen(true), 750);
+  };
+
   const removeFromCart = (productId: string, optionSize?: string, variantId?: string) => {
     setCart((prevCart) => prevCart.filter((item) => !sameLine(item, productId, optionSize, variantId)));
   };
@@ -121,6 +159,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       value={{
         cart,
         addToCart,
+        addCombo,
         removeFromCart,
         updateQuantity,
         clearCart,
