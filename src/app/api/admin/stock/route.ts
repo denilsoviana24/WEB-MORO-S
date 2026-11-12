@@ -55,6 +55,7 @@ export async function POST(req: Request) {
     variantId?: string;
     delta?: number;
     reason?: string;
+    stock?: number;
   };
 
   if (body.action === 'expire') {
@@ -69,6 +70,31 @@ export async function POST(req: Request) {
       await guard.svc.rpc('sync_product_stock', { p_product: p.id });
     }
     return NextResponse.json({ ok: true, synced: products?.length ?? 0 }, { headers: NO_STORE });
+  }
+
+  if (body.action === 'enable_all') {
+    const stock = Math.max(0, Math.floor(Number(body.stock) || 0));
+    const { data: variants } = await guard.svc
+      .from('product_variants')
+      .select('id,product_id')
+      .eq('manage_stock', false);
+
+    const ids = (variants || []).map((v) => v.id);
+    if (!ids.length) return NextResponse.json({ ok: true, updated: 0 }, { headers: NO_STORE });
+
+    const { error } = await guard.svc
+      .from('product_variants')
+      .update({ manage_stock: true, stock, updated_at: new Date().toISOString() })
+      .in('id', ids);
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 400, headers: NO_STORE });
+
+    const products = [...new Set((variants || []).map((v) => v.product_id))];
+    for (const pid of products) {
+      await guard.svc.rpc('sync_product_stock', { p_product: pid });
+    }
+
+    return NextResponse.json({ ok: true, updated: ids.length, stock }, { headers: NO_STORE });
   }
 
   if (body.action === 'adjust') {

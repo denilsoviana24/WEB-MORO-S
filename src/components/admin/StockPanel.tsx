@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { RefreshCw, Plus, Minus, Package, Clock, History, AlertTriangle, Truck } from 'lucide-react';
+import { RefreshCw, Plus, Minus, Package, Clock, History, AlertTriangle, Truck, Pencil, Save, X, ToggleLeft } from 'lucide-react';
 import { adminFetch, shortDate } from '@/lib/adminClient';
 
 interface StockRow {
@@ -40,6 +40,10 @@ export default function StockPanel() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [q, setQ] = useState('');
+  const [showBulk, setShowBulk] = useState(false);
+  const [bulkStock, setBulkStock] = useState('10');
+  const [edit, setEdit] = useState<{ id: string; stock: string; manage: boolean } | null>(null);
+  const [savingRow, setSavingRow] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -88,6 +92,47 @@ export default function StockPanel() {
     }
   };
 
+  /** Convierte todos los productos ilimitados en inventario controlado. */
+  const enableAll = async () => {
+    const stock = Math.max(0, Math.floor(Number(bulkStock) || 0));
+    setError('');
+    try {
+      const res = await adminFetch<{ updated: number }>('/api/admin/stock', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'enable_all', stock }),
+      });
+      setShowBulk(false);
+      await load();
+      if (res.updated === 0) setError('Todos los productos ya tienen inventario controlado.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo activar.');
+    }
+  };
+
+  /** Guarda el stock de una variante (y si controla inventario o es ilimitada). */
+  const saveRow = async () => {
+    if (!edit) return;
+    setSavingRow(true);
+    setError('');
+    try {
+      await adminFetch('/api/admin/catalog', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          resource: 'variants',
+          id: edit.id,
+          manage_stock: edit.manage,
+          stock: edit.manage ? Math.max(0, Math.floor(Number(edit.stock) || 0)) : 0,
+        }),
+      });
+      setEdit(null);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo guardar.');
+    } finally {
+      setSavingRow(false);
+    }
+  };
+
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
     if (!term) return rows;
@@ -119,6 +164,13 @@ export default function StockPanel() {
         </div>
         <div className="flex gap-2">
           <button
+            onClick={() => setShowBulk((v) => !v)}
+            className="flex items-center gap-2 text-xs font-black text-zinc-950 bg-amber-500 hover:bg-amber-400 px-3 py-2 rounded-xl"
+            title="Convertir productos ilimitados en inventario controlado"
+          >
+            <ToggleLeft className="w-3.5 h-3.5" /> Activar inventario
+          </button>
+          <button
             onClick={expire}
             className="flex items-center gap-2 text-xs font-bold text-zinc-200 bg-zinc-800 hover:bg-zinc-700 px-3 py-2 rounded-xl"
             title="Liberar reservas vencidas"
@@ -133,6 +185,43 @@ export default function StockPanel() {
           </button>
         </div>
       </div>
+
+      {showBulk && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 space-y-2">
+          <p className="text-xs font-bold text-amber-300">
+            Esto activa el control de inventario en todos los productos que hoy son ilimitados (∞).
+          </p>
+          <div className="flex flex-wrap items-end gap-2">
+            <div>
+              <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider block mb-1">
+                Stock inicial para cada uno
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={bulkStock}
+                onChange={(e) => setBulkStock(e.target.value)}
+                className="w-40 bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500"
+              />
+            </div>
+            <button
+              onClick={enableAll}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black text-zinc-950 bg-amber-500 hover:bg-amber-400"
+            >
+              <Save className="w-4 h-4" /> Aplicar a todos
+            </button>
+            <button
+              onClick={() => setShowBulk(false)}
+              className="px-3 py-2 rounded-xl text-xs font-bold text-zinc-300 bg-zinc-800 hover:bg-zinc-700"
+            >
+              Cancelar
+            </button>
+          </div>
+          <p className="text-[10px] text-zinc-500">
+            Después puedes ajustar la cantidad de cada producto con el lápiz ✏️ de la tabla.
+          </p>
+        </div>
+      )}
 
       {error && (
         <p className="text-xs font-bold text-red-400 bg-red-500/10 border border-red-500/30 rounded-xl px-3 py-2">{error}</p>
@@ -185,7 +274,37 @@ export default function StockPanel() {
                       {r.sku || '—'} {r.title && r.title !== 'Único' ? `· ${r.title}` : ''}
                     </p>
                   </td>
-                  <td className="px-3 py-2 text-zinc-200">{r.manage_stock ? r.stock : '∞'}</td>
+                  <td className="px-3 py-2">
+                    {edit?.id === r.id ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min="0"
+                          value={edit.stock}
+                          onChange={(e) => setEdit({ ...edit, stock: e.target.value })}
+                          className="w-20 bg-zinc-900 border border-amber-500/50 rounded-lg px-2 py-1 text-xs text-white focus:outline-none"
+                          autoFocus
+                        />
+                        <label className="flex items-center gap-1 text-[10px] font-bold text-zinc-400">
+                          <input
+                            type="checkbox"
+                            checked={edit.manage}
+                            onChange={(e) => setEdit({ ...edit, manage: e.target.checked })}
+                            className="accent-amber-500"
+                          />
+                          Controlar
+                        </label>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setEdit({ id: r.id, stock: String(r.stock ?? 0), manage: r.manage_stock })}
+                        className="text-zinc-200 hover:text-amber-400 font-bold"
+                        title="Editar cantidad"
+                      >
+                        {r.manage_stock ? r.stock : '∞'}
+                      </button>
+                    )}
+                  </td>
                   <td className="px-3 py-2 text-violet-400">{r.reserved}</td>
                   <td className="px-3 py-2">
                     <span
@@ -198,22 +317,51 @@ export default function StockPanel() {
                   </td>
                   <td className="px-3 py-2">
                     <div className="flex justify-end gap-1">
-                      <button
-                        onClick={() => adjust(r.id, -1)}
-                        disabled={!r.manage_stock || (r.stock || 0) <= 0}
-                        className="p-1.5 rounded-lg text-zinc-300 hover:bg-zinc-800 disabled:opacity-30"
-                        title="Quitar 1"
-                      >
-                        <Minus className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => adjust(r.id, 1)}
-                        disabled={!r.manage_stock}
-                        className="p-1.5 rounded-lg text-amber-400 hover:bg-amber-500/10 disabled:opacity-30"
-                        title="Sumar 1"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                      </button>
+                      {edit?.id === r.id ? (
+                        <>
+                          <button
+                            onClick={saveRow}
+                            disabled={savingRow}
+                            className="p-1.5 rounded-lg text-emerald-400 hover:bg-emerald-500/10 disabled:opacity-40"
+                            title="Guardar"
+                          >
+                            <Save className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => setEdit(null)}
+                            className="p-1.5 rounded-lg text-zinc-400 hover:bg-zinc-800"
+                            title="Cancelar"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => adjust(r.id, -1)}
+                            disabled={!r.manage_stock || (r.stock || 0) <= 0}
+                            className="p-1.5 rounded-lg text-zinc-300 hover:bg-zinc-800 disabled:opacity-30"
+                            title="Quitar 1"
+                          >
+                            <Minus className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => adjust(r.id, 1)}
+                            disabled={!r.manage_stock}
+                            className="p-1.5 rounded-lg text-amber-400 hover:bg-amber-500/10 disabled:opacity-30"
+                            title="Sumar 1"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => setEdit({ id: r.id, stock: String(r.stock ?? 0), manage: r.manage_stock })}
+                            className="p-1.5 rounded-lg text-zinc-300 hover:bg-zinc-800"
+                            title="Editar cantidad"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
