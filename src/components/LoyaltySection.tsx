@@ -7,38 +7,49 @@ import Reveal from './Reveal';
 import { friesRain } from '@/lib/friesRain';
 import { getLoyaltyStamps, addLoyaltyStamp, resetLoyaltyStamps, LOYALTY_EVENT } from '@/lib/loyalty';
 import { useAuth } from '@/context/AuthContext';
-import {
-  LOYALTY_TIERS,
-  LOYALTY_PROMOS,
-  STAMPS_GOAL,
-  STAMPS_REWARD,
-} from '@/data/loyaltyData';
+import { LOYALTY_PROMOS } from '@/data/loyaltyData';
+import { CLUB_FALLBACK, getClubConfig, type ClubConfig } from '@/lib/clubConfig';
 
 export default function LoyaltySection() {
   const { user, profile, addStampCloud, resetStampsCloud, redeemReward, setAuthModalOpen } = useAuth();
+  const [config, setConfig] = useState<ClubConfig>(CLUB_FALLBACK);
   const [localStamps, setLocalStamps] = useState(0);
   const [copied, setCopied] = useState<string | null>(null);
   const [claimedMsg, setClaimedMsg] = useState('');
   const [owner, setOwner] = useState(false);
   const [taps, setTaps] = useState(0);
 
+  const goal = config.stampsGoal;
+  const reward = config.reward;
+
   // Con sesión: sellos de la nube. Invitado: sellos del equipo.
   const stamps = user ? (profile?.stamps ?? 0) : localStamps;
 
+  // Reglas del club editables desde el panel
+  useEffect(() => {
+    let alive = true;
+    getClubConfig().then((c) => {
+      if (alive) setConfig(c);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   // Carga inicial + se actualiza solo cuando el carrito suma un sello
   useEffect(() => {
-    setLocalStamps(getLoyaltyStamps(STAMPS_GOAL));
+    setLocalStamps(getLoyaltyStamps(goal));
     try {
       if (sessionStorage.getItem('moros-owner') === '1') setOwner(true);
     } catch {
       // ignorar
     }
-    const refresh = () => setLocalStamps(getLoyaltyStamps(STAMPS_GOAL));
+    const refresh = () => setLocalStamps(getLoyaltyStamps(goal));
     window.addEventListener(LOYALTY_EVENT, refresh);
     return () => window.removeEventListener(LOYALTY_EVENT, refresh);
-  }, []);
+  }, [goal]);
 
-  const unlocked = stamps >= STAMPS_GOAL;
+  const unlocked = stamps >= goal;
 
   // 5 toques en el título = modo dueño (solo personal del local)
   const handleTitleTap = () => {
@@ -69,10 +80,10 @@ export default function LoyaltySection() {
 
   const addStamp = async () => {
     if (user) {
-      const r = await addStampCloud(STAMPS_GOAL);
+      const r = await addStampCloud(goal);
       if (r?.completed) friesRain();
     } else {
-      const { stamps: next, completed } = addLoyaltyStamp(STAMPS_GOAL);
+      const { stamps: next, completed } = addLoyaltyStamp(goal);
       setLocalStamps(next);
       if (completed) friesRain();
     }
@@ -80,7 +91,7 @@ export default function LoyaltySection() {
 
   const claimReward = async () => {
     if (user) {
-      const r = await redeemReward(STAMPS_REWARD.code, STAMPS_REWARD.title, STAMPS_GOAL);
+      const r = await redeemReward(reward.code, reward.title, goal);
       if (r.ok) {
         setClaimedMsg(r.message);
         window.setTimeout(() => setClaimedMsg(''), 8000);
@@ -122,11 +133,12 @@ export default function LoyaltySection() {
             <span>Clientes fieles</span>
           </div>
           <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
-            Mientras más vienes, <span className="bg-gradient-to-r from-orange-500 via-amber-400 to-yellow-400 bg-clip-text text-transparent">más ganas</span>
+            {config.section.title}{' '}
+            <span className="bg-gradient-to-r from-orange-500 via-amber-400 to-yellow-400 bg-clip-text text-transparent">
+              {config.section.highlight}
+            </span>
           </h2>
-          <p className="text-zinc-400 text-sm max-w-xl mx-auto mt-3">
-            Junta sellos en tu tarjeta fiel con cada visita y sube de nivel para desbloquear descuentos, regalos y promos exclusivas.
-          </p>
+          <p className="text-zinc-400 text-sm max-w-xl mx-auto mt-3">{config.section.subtitle}</p>
         </Reveal>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
@@ -143,7 +155,7 @@ export default function LoyaltySection() {
                   <h3 className="font-black text-white text-lg">Mi Tarjeta Fiel</h3>
                 </button>
                 <span className="text-xs font-bold text-zinc-400">
-                  {stamps}/{STAMPS_GOAL} sellos
+                  {stamps}/{goal} sellos
                 </span>
               </div>
               {owner && (
@@ -166,14 +178,14 @@ export default function LoyaltySection() {
               <div className="mt-3 h-2.5 rounded-full bg-zinc-800 overflow-hidden">
                 <motion.div
                   className="h-full rounded-full bg-gradient-to-r from-orange-600 via-amber-500 to-yellow-400"
-                  animate={{ width: `${(stamps / STAMPS_GOAL) * 100}%` }}
+                  animate={{ width: `${(stamps / goal) * 100}%` }}
                   transition={{ type: 'spring', stiffness: 90, damping: 18 }}
                 />
               </div>
 
               {/* sellos */}
               <div className="mt-5 grid grid-cols-5 gap-2 sm:gap-3">
-                {Array.from({ length: STAMPS_GOAL }).map((_, i) => (
+                {Array.from({ length: goal }).map((_, i) => (
                   <motion.div
                     key={i}
                     initial={false}
@@ -189,9 +201,7 @@ export default function LoyaltySection() {
                 ))}
               </div>
 
-              <p className="mt-4 text-xs text-zinc-400 leading-relaxed">
-                Muestra tu tarjeta en el local para sellar tu visita. Cada pedido en la web suma 1 sello automáticamente 🍟. Al completar los {STAMPS_GOAL} sellos reclamas tu premio.
-              </p>
+              <p className="mt-4 text-xs text-zinc-400 leading-relaxed">{config.section.note}</p>
 
               {/* Invitado: invitar a crear cuenta para no perder sellos */}
               {!user && (
@@ -229,18 +239,18 @@ export default function LoyaltySection() {
                       <Gift className="w-4 h-4" />
                       <span>¡Premio desbloqueado!</span>
                     </div>
-                    <p className="text-white font-bold text-sm mt-1">{STAMPS_REWARD.title}</p>
-                    <p className="text-zinc-400 text-xs mt-1">{STAMPS_REWARD.description}</p>
+                    <p className="text-white font-bold text-sm mt-1">{reward.title}</p>
+                    <p className="text-zinc-400 text-xs mt-1">{reward.description}</p>
                     <div className="mt-3 flex items-center gap-2">
                       <code className="flex-1 bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-amber-400 font-black text-sm text-center tracking-widest">
-                        {STAMPS_REWARD.code}
+                        {reward.code}
                       </code>
                       <button
-                        onClick={() => copyCode(STAMPS_REWARD.code)}
+                        onClick={() => copyCode(reward.code)}
                         className="p-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition-colors"
                         title="Copiar código"
                       >
-                        {copied === STAMPS_REWARD.code ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                        {copied === reward.code ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
                       </button>
                     </div>
                     {owner ? (
@@ -264,7 +274,7 @@ export default function LoyaltySection() {
           {/* Niveles + cupones */}
           <div className="flex flex-col gap-6">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {LOYALTY_TIERS.map((tier, i) => (
+              {config.tiers.map((tier, i) => (
                 <Reveal key={tier.id} delay={i * 0.1} className="h-full">
                   <div className={`h-full rounded-3xl border ${tier.border} bg-zinc-900/70 p-5`}>
                     <div className={`w-11 h-11 rounded-2xl bg-gradient-to-br ${tier.color} flex items-center justify-center text-2xl shadow-lg`}>

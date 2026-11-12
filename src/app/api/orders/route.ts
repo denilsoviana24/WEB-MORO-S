@@ -110,12 +110,17 @@ export async function POST(req: Request) {
 
   /* 1) Combos declarados ---------------------------------------- */
   const comboIds = [...new Set(rawItems.map((i) => i.comboId).filter(Boolean) as string[])];
-  const [{ data: comboRows }, { data: settingsRow }, { data: taxes }, { data: currencies }] = await Promise.all([
-    comboIds.length ? svc.from('combos').select('*').in('id', comboIds) : Promise.resolve({ data: [] }),
-    svc.from('store_settings').select('*').eq('id', 1).maybeSingle(),
-    svc.from('tax_rates').select('*').eq('active', true),
-    svc.from('currencies').select('*').eq('active', true),
-  ]);
+  const [{ data: comboRows }, { data: settingsRow }, { data: taxes }, { data: currencies }, { data: clubRow }] =
+    await Promise.all([
+      comboIds.length ? svc.from('combos').select('*').in('id', comboIds) : Promise.resolve({ data: [] }),
+      svc.from('store_settings').select('*').eq('id', 1).maybeSingle(),
+      svc.from('tax_rates').select('*').eq('active', true),
+      svc.from('currencies').select('*').eq('active', true),
+      svc.from('club_settings').select('stamps_goal,auto_stamp').eq('id', 1).maybeSingle(),
+    ]);
+
+  const clubGoal = Number((clubRow as { stamps_goal?: number } | null)?.stamps_goal) || STAMPS_GOAL;
+  const autoStamp = (clubRow as { auto_stamp?: boolean } | null)?.auto_stamp !== false;
 
   const settings: StoreSettings = { ...SETTINGS_DEFAULT, ...(settingsRow || {}) };
   const mode = settings.rounding_mode as RoundingMode;
@@ -473,8 +478,8 @@ export async function POST(req: Request) {
 
     if (prof) {
       const current = Number(prof.stamps) || 0;
-      const next = Math.min(current + 1, STAMPS_GOAL);
-      completed = next === STAMPS_GOAL && current < STAMPS_GOAL;
+      const next = autoStamp ? Math.min(current + 1, clubGoal) : current;
+      completed = autoStamp && next === clubGoal && current < clubGoal;
       stamps = next;
       await svc
         .from('profiles')

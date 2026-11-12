@@ -8,7 +8,7 @@ import { RESTAURANT_INFO } from '@/data/menuData';
 import CheckoutPayment from '@/components/CheckoutPayment';
 import OrderTicket, { type OrderData } from '@/components/OrderTicket';
 import { addLoyaltyStamp } from '@/lib/loyalty';
-import { STAMPS_GOAL } from '@/data/loyaltyData';
+import { getClubConfig } from '@/lib/clubConfig';
 import { friesRain } from '@/lib/friesRain';
 import { useAuth } from '@/context/AuthContext';
 import { useProducts } from '@/context/ProductsContext';
@@ -126,7 +126,8 @@ export default function CartDrawer() {
       await refreshProfile();
       if (result?.completed) friesRain();
     } else {
-      const { completed } = addLoyaltyStamp(STAMPS_GOAL);
+      const config = await getClubConfig();
+      const { completed } = addLoyaltyStamp(config.stampsGoal);
       if (completed) friesRain();
     }
     setTicket(order);

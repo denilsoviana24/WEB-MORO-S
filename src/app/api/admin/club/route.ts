@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/adminAuth';
+import { normalizeTiers } from '@/lib/clubConfig';
 
 /**
  * Admin · Club Moro's.
@@ -35,13 +36,21 @@ interface RedemptionRow {
   reward_code: string;
   reward_title: string;
   stamps_used: number;
+  delivered_at: string | null;
+  notes: string | null;
   created_at: string;
 }
 
-function tierOf(orders: number): { id: string; name: string; icon: string } {
-  if (orders >= 15) return { id: 'oro', name: 'Moro Oro', icon: '🥇' };
-  if (orders >= 7) return { id: 'plata', name: 'Moro Plata', icon: '🥈' };
-  if (orders >= 1) return { id: 'bronce', name: 'Moro Bronce', icon: '🥉' };
+interface Levels {
+  bronze: number;
+  silver: number;
+  gold: number;
+}
+
+function tierOf(orders: number, levels: Levels): { id: string; name: string; icon: string } {
+  if (orders >= levels.gold) return { id: 'oro', name: 'Moro Oro', icon: '🥇' };
+  if (orders >= levels.silver) return { id: 'plata', name: 'Moro Plata', icon: '🥈' };
+  if (orders >= levels.bronze) return { id: 'bronce', name: 'Moro Bronce', icon: '🥉' };
   return { id: 'nuevo', name: 'Nuevo', icon: '✨' };
 }
 
@@ -49,7 +58,7 @@ export async function GET(req: Request) {
   const guard = await requireAdmin(req);
   if (!guard.ok) return guard.res;
 
-  const [profilesRes, ordersRes, redemptionsRes] = await Promise.all([
+  const [profilesRes, ordersRes, redemptionsRes, settingsRes] = await Promise.all([
     guard.svc
       .from('profiles')
       .select('id,email,name,stamps,total_orders,total_spent,created_at')
@@ -65,11 +74,20 @@ export async function GET(req: Request) {
       .select('*')
       .order('created_at', { ascending: false })
       .limit(200),
+    guard.svc.from('club_settings').select('*').eq('id', 1).maybeSingle(),
   ]);
 
   const profiles = (profilesRes.data || []) as ProfileRow[];
   const orders = (ordersRes.data || []) as OrderRow[];
   const redemptions = (redemptionsRes.data || []) as RedemptionRow[];
+  const settingsRow = (settingsRes.data || null) as Record<string, unknown> | null;
+
+  const levels: Levels = {
+    bronze: Number(settingsRow?.bronze_orders ?? 1),
+    silver: Number(settingsRow?.silver_orders ?? 7),
+    gold: Number(settingsRow?.gold_orders ?? 15),
+  };
+  const goal = Number(settingsRow?.stamps_goal ?? 20) || 20;
 
   const byUser = new Map<string, OrderRow[]>();
   for (const order of orders) {
@@ -99,7 +117,7 @@ export async function GET(req: Request) {
       name: p.name || 'Sin nombre',
       email: p.email,
       stamps: Number(p.stamps) || 0,
-      tier: tierOf(valid.length),
+      tier: tierOf(valid.length, levels),
       orders: valid.length,
       totalOrders: Number(p.total_orders) || 0,
       spent: Math.round(Number(p.total_spent || 0) * 100) / 100,
@@ -216,8 +234,12 @@ export async function GET(req: Request) {
       members,
       guests,
       couponUses,
+      settings: settingsRow,
+      goal,
+      levels,
       redemptions: redemptions.map((r) => ({
         ...r,
+        delivered: Boolean(r.delivered_at),
         customer: profiles.find((p) => p.id === r.user_id)?.name || 'Cliente',
         email: profiles.find((p) => p.id === r.user_id)?.email || '',
       })),
@@ -226,6 +248,7 @@ export async function GET(req: Request) {
         newThisMonth: members.filter((m) => new Date(m.createdAt).getTime() >= monthStart).length,
         stampsInCards: members.reduce((s, m) => s + m.stamps, 0),
         rewardsRedeemed: redemptions.length,
+        rewardsPending: redemptions.filter((r) => !r.delivered_at).length,
         couponsUsed: couponUses.length,
         discountGiven: Math.round(couponUses.reduce((s, c) => s + c.discount, 0) * 100) / 100,
         membersWithOrders: members.filter((m) => m.orders > 0).length,
@@ -237,4 +260,122 @@ export async function GET(req: Request) {
     },
     { headers: NO_STORE }
   );
+}
+
+/**
+ * PATCH /api/admin/club
+ * action = 'settings'   → reglas, premio, niveles y textos de la web
+ * action = 'member'     → sellos o nombre de un cliente
+ * action = 'redemption' → marcar/desmarcar un premio como entregado
+ */
+export async function PATCH(req: Request) {
+  const guard = await requireAdmin(req);
+  if (!guard.ok) return guard.res;
+
+  const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+  const action = String(body.action || '');
+
+  /* ---------- Reglas y textos del club ---------- */
+  if (action === 'settings') {
+    const input = (body.settings || {}) as Record<string, unknown>;
+    const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+
+    const setInt = (key: string, min: number, max: number) => {
+      if (input[key] === undefined) return;
+      const n = Number(input[key]);
+      if (!Number.isFinite(n)) return;
+      patch[key] = Math.min(max, Math.max(min, Math.round(n)));
+    };
+    const setText = (key: string, max: number) => {
+      if (input[key] === undefined) return;
+      const value = String(input[key]).slice(0, max).trim();
+      if (value) patch[key] = value;
+    };
+
+    setInt('stamps_goal', 1, 100);
+    setInt('bronze_orders', 0, 999);
+    setInt('silver_orders', 0, 999);
+    setInt('gold_orders', 0, 999);
+    setText('reward_code', 40);
+    setText('reward_title', 140);
+    setText('reward_description', 400);
+    setText('section_title', 120);
+    setText('section_highlight', 60);
+    setText('section_subtitle', 300);
+    setText('section_note', 400);
+
+    if (input.auto_stamp !== undefined) patch.auto_stamp = Boolean(input.auto_stamp);
+    if (input.tiers !== undefined) patch.tiers = normalizeTiers(input.tiers);
+
+    const { data, error } = await guard.svc
+      .from('club_settings')
+      .update(patch)
+      .eq('id', 1)
+      .select('*')
+      .single();
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 400, headers: NO_STORE });
+    return NextResponse.json({ settings: data }, { headers: NO_STORE });
+  }
+
+  /* ---------- Sellos / nombre de un cliente ---------- */
+  if (action === 'member') {
+    const id = String(body.id || '');
+    if (!id) return NextResponse.json({ error: 'Falta el cliente.' }, { status: 400 });
+
+    const { data: settingsRow } = await guard.svc
+      .from('club_settings')
+      .select('stamps_goal')
+      .eq('id', 1)
+      .maybeSingle();
+    const goal = Number(settingsRow?.stamps_goal ?? 20) || 20;
+
+    const patch: Record<string, unknown> = {};
+    if (body.stamps !== undefined) {
+      const n = Number(body.stamps);
+      if (!Number.isFinite(n)) return NextResponse.json({ error: 'Sellos inválidos.' }, { status: 400 });
+      patch.stamps = Math.min(goal, Math.max(0, Math.round(n)));
+    }
+    if (body.name !== undefined) {
+      const name = String(body.name).trim().slice(0, 40);
+      if (!name) return NextResponse.json({ error: 'El nombre no puede quedar vacío.' }, { status: 400 });
+      patch.name = name;
+    }
+
+    if (Object.keys(patch).length === 0) {
+      return NextResponse.json({ error: 'Nada que actualizar.' }, { status: 400 });
+    }
+
+    const { data, error } = await guard.svc
+      .from('profiles')
+      .update(patch)
+      .eq('id', id)
+      .select('id,email,name,stamps,total_orders,total_spent,created_at')
+      .single();
+
+    if (error) {
+      const msg = error.message.includes('duplicate') ? 'Ese nombre ya está en uso.' : error.message;
+      return NextResponse.json({ error: msg }, { status: 400, headers: NO_STORE });
+    }
+    return NextResponse.json({ member: data }, { headers: NO_STORE });
+  }
+
+  /* ---------- Premio entregado ---------- */
+  if (action === 'redemption') {
+    const id = String(body.id || '');
+    if (!id) return NextResponse.json({ error: 'Falta el premio.' }, { status: 400 });
+
+    const delivered = body.delivered !== false;
+    const { data, error } = await guard.svc
+      .from('redemptions')
+      .update({ delivered_at: delivered ? new Date().toISOString() : null })
+      .eq('id', id)
+      .select('*')
+      .single();
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 400, headers: NO_STORE });
+    return NextResponse.json({ redemption: { ...data, delivered } }, { headers: NO_STORE });
+  }
+
+  return NextResponse.json({ error: 'Acción desconocida.' }, { status: 400 });
 }

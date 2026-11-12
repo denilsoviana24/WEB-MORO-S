@@ -60,15 +60,22 @@ export async function PATCH(req: Request) {
   const id = String(body.id || '');
   if (!id) return NextResponse.json({ error: 'Falta el id.' }, { status: 400 });
 
+  const { data: clubRow } = await guard.svc
+    .from('club_settings')
+    .select('stamps_goal')
+    .eq('id', 1)
+    .maybeSingle();
+  const goal = Number(clubRow?.stamps_goal ?? 20) || 20;
+
   const patch: Record<string, unknown> = {};
 
   if (body.stamps !== undefined) {
-    patch.stamps = Math.max(0, Math.min(20, Math.floor(Number(body.stamps) || 0)));
+    patch.stamps = Math.max(0, Math.min(goal, Math.floor(Number(body.stamps) || 0)));
   }
 
   if (body.add_stamp) {
     const { data: current } = await guard.svc.from('profiles').select('stamps').eq('id', id).maybeSingle();
-    patch.stamps = Math.min(20, (Number(current?.stamps) || 0) + 1);
+    patch.stamps = Math.min(goal, (Number(current?.stamps) || 0) + 1);
   }
 
   if (body.is_admin !== undefined) {
