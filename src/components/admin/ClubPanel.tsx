@@ -287,7 +287,12 @@ export default function ClubPanel() {
       setEditing(false);
       flash('Reglas del club guardadas.');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo guardar.');
+      const msg = e instanceof Error ? e.message : 'No se pudo guardar.';
+      setError(
+        msg.includes('club_settings')
+          ? 'Falta activar el Club editable en Supabase: ejecuta el archivo supabase/migration_club_editable.sql.'
+          : msg
+      );
     } finally {
       setSaving(false);
     }
