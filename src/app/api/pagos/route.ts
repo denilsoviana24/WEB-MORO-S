@@ -166,8 +166,14 @@ export async function POST(req: Request) {
     }
 
     const data = await res.json();
+    // Con credenciales de prueba (TEST-...) se usa el entorno sandbox.
+    const isTest = token.startsWith('TEST-');
+    const checkoutUrl = isTest
+      ? data.sandbox_init_point || data.init_point
+      : data.init_point || data.sandbox_init_point;
+
     return NextResponse.json({
-      init_point: data.init_point,
+      init_point: checkoutUrl,
       sandbox_init_point: data.sandbox_init_point,
       preference_id: data.id,
       reference,
