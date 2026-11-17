@@ -29,8 +29,6 @@ import {
   PAYMENT_METHODS,
   BANK_ACCOUNT,
   MERCADOPAGO_LINK,
-  DEUNA_LINK,
-  DEUNA_QR,
   type PaymentMethodId,
 } from '@/data/paymentData';
 
@@ -53,7 +51,6 @@ const METHOD_LABEL: Record<PaymentMethodId, string> = {
   transfer: 'Transferencia bancaria',
   card: 'Tarjeta en línea (Mercado Pago)',
   kushki: 'Tarjeta en línea (Kushki)',
-  deuna: 'DeUna (Banco Pichincha)',
 };
 
 interface QuoteLine {
@@ -387,7 +384,6 @@ export default function CheckoutPayment({
 
     // Pasarela externa (si está configurada)
     if (method === 'card' && MERCADOPAGO_LINK) window.open(MERCADOPAGO_LINK, '_blank');
-    if (method === 'deuna' && DEUNA_LINK) window.open(DEUNA_LINK, '_blank');
 
     const order: OrderData = {
       number: finalNumber,
@@ -694,18 +690,6 @@ export default function CheckoutPayment({
                 {copied === 'account' ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
                 Copiar número de cuenta
               </button>
-            </div>
-          )}
-
-          {method === 'deuna' && (
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs space-y-2">
-              <p className="text-zinc-300">Paga con DeUna al {RESTAURANT_INFO.phone}</p>
-              {DEUNA_LINK && (
-                <a href={DEUNA_LINK} target="_blank" rel="noreferrer" className="text-amber-400 font-bold underline">
-                  Abrir enlace de pago DeUna
-                </a>
-              )}
-              {DEUNA_QR && <img src={DEUNA_QR} alt="QR DeUna" className="w-40 rounded-lg" />}
             </div>
           )}
 

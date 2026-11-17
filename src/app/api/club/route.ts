@@ -18,10 +18,7 @@ export async function GET() {
 
   try {
     const { data } = await svc.from('club_settings').select('*').eq('id', 1).maybeSingle();
-    return NextResponse.json(
-      { config: configFromRow(data) },
-      { headers: { 'Cache-Control': 'public, max-age=30, s-maxage=30' } }
-    );
+    return NextResponse.json({ config: configFromRow(data) }, { headers: { 'Cache-Control': 'no-store' } });
   } catch {
     return NextResponse.json(
       { config: configFromRow(null) },
