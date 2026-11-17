@@ -1,78 +1,166 @@
 import { NextResponse } from 'next/server';
+import { serviceClient } from '@/lib/adminAuth';
+import { markOrderPaid, releaseOrderAfterDecline } from '@/lib/payments';
+
+export const dynamic = 'force-dynamic';
 
 /**
  * POST /api/pagos/kushki
- * Cobra una tarjeta tokenizada con Kushki.js en el frontend.
+ * Cobra la tarjeta tokenizada con Kushki.js en el navegador.
  *
- * Requiere en Vercel / .env.local (SOLO servidor):
- *   KUSHKI_PRIVATE_KEY=...   (credencial privada de Kushki)
- *   KUSHKI_ENV=test|production (por defecto: test)
+ * El monto SIEMPRE sale de la base de datos (orders.total), nunca del navegador.
+ * Requiere en Vercel / .env.local (solo servidor):
+ *   KUSHKI_PRIVATE_KEY=...      (credencial privada)
+ *   KUSHKI_ENV=test|production   (por defecto: test)
  *
- * IMPORTANTE: valida este flujo con las tarjetas de prueba de Kushki
- * (https://docs.kushkipagos.com) antes de recibir pagos reales.
- * El IVA se envía en 0: ajústalo con tu contador según tu facturación.
+ * Si el banco rechaza la tarjeta: el pedido se cancela y se libera el stock.
+ * Si aprueba: pedido pagado + stock descontado.
  */
+
+interface Body {
+  token?: string;
+  orderId?: string;
+}
+
+interface OrderRow {
+  id: string;
+  order_number: string;
+  total: number;
+  currency: string | null;
+  payment_status: string | null;
+}
+
+const declined = (message: string) =>
+  NextResponse.json(
+    {
+      approved: false,
+      error: 'DECLINED',
+      message: message || 'La tarjeta fue rechazada. Verifica los datos o usa otro método.',
+    },
+    { status: 402 }
+  );
+
 export async function POST(req: Request) {
   const privateKey = process.env.KUSHKI_PRIVATE_KEY;
-
   if (!privateKey) {
     return NextResponse.json(
-      { error: 'NOT_CONFIGURED', message: 'Kushki aún no configurado.' },
+      { approved: false, error: 'NOT_CONFIGURED', message: 'Kushki aún no está configurado.' },
       { status: 501 }
     );
   }
 
-  let body: { token?: string; amount?: number; orderNumber?: string };
+  let body: Body;
   try {
-    body = await req.json();
+    body = (await req.json()) as Body;
   } catch {
-    return NextResponse.json({ error: 'BAD_REQUEST' }, { status: 400 });
+    return NextResponse.json({ approved: false, error: 'BAD_REQUEST' }, { status: 400 });
   }
 
-  const total = Number(body.amount || 0);
-  if (!body.token || !(total > 0)) {
-    return NextResponse.json({ error: 'BAD_REQUEST' }, { status: 400 });
+  const token = String(body.token || '').trim();
+  const orderId = String(body.orderId || '').trim();
+  if (!token || !orderId) {
+    return NextResponse.json(
+      { approved: false, error: 'BAD_REQUEST', message: 'Faltan los datos del pago.' },
+      { status: 400 }
+    );
   }
 
+  const svc = serviceClient();
+  if (!svc) {
+    return NextResponse.json({ approved: false, error: 'NOT_CONFIGURED' }, { status: 501 });
+  }
+
+  const { data: order } = await svc
+    .from('orders')
+    .select('id,order_number,total,currency,payment_status')
+    .eq('id', orderId)
+    .maybeSingle<OrderRow>();
+
+  if (!order) {
+    return NextResponse.json(
+      { approved: false, error: 'NOT_FOUND', message: 'No encontramos tu pedido.' },
+      { status: 404 }
+    );
+  }
+
+  // Idempotente: si ya está pagado, no se vuelve a cobrar.
+  if (order.payment_status === 'paid') {
+    return NextResponse.json({ approved: true, alreadyPaid: true, ticket: '' });
+  }
+
+  const total = Number(order.total);
+  if (!(total > 0)) {
+    return NextResponse.json(
+      { approved: false, error: 'BAD_ORDER', message: 'El pedido no tiene un total válido.' },
+      { status: 400 }
+    );
+  }
+
+  const currency = /^[A-Z]{3}$/.test(String(order.currency || '')) ? String(order.currency) : 'USD';
   const base =
     process.env.KUSHKI_ENV === 'production'
-      ? 'https://api.kushki.com'
-      : 'https://api-uat.kushki.com';
+      ? 'https://api.kushkipagos.com'
+      : 'https://api-uat.kushkipagos.com';
 
   try {
-    const res = await fetch(`${base}/v1/charges`, {
+    const res = await fetch(`${base}/card/v1/charges`, {
       method: 'POST',
       headers: {
         'Private-Merchant-Id': privateKey,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        token: body.token,
+        token,
         amount: {
           subtotalIva: 0,
           subtotalIva0: Number(total.toFixed(2)),
+          ice: 0,
           iva: 0,
-          currency: 'USD',
+          currency,
         },
         fullResponse: true,
       }),
     });
 
-    const data = await res.json().catch(() => ({}));
+    const data = (await res.json().catch(() => ({}))) as {
+      ticketNumber?: string;
+      message?: string;
+      details?: { ticketNumber?: string; message?: string };
+    };
 
-    if (!res.ok) {
-      console.error('Kushki error:', JSON.stringify(data).slice(0, 300));
-      return NextResponse.json(
-        { error: 'DECLINED', message: 'La tarjeta fue rechazada. Verifica los datos o usa otro método.' },
-        { status: 402 }
-      );
+    const ticket = String(data?.ticketNumber || data?.details?.ticketNumber || '');
+
+    if (!res.ok || !ticket) {
+      console.error('Kushki rechazó el cobro:', res.status, JSON.stringify(data).slice(0, 300));
+      await releaseOrderAfterDecline(svc, order.id);
+      return declined(String(data?.message || data?.details?.message || ''));
     }
 
-    const ticket =
-      data?.ticketNumber || data?.details?.ticketNumber || body.orderNumber || '';
-    return NextResponse.json({ approved: true, ticket });
+    const ok = await markOrderPaid(svc, order.id);
+    if (!ok) {
+      // El cobro se hizo pero no pudimos actualizar el pedido: dejar rastro.
+      console.error('Kushki cobró pero no se pudo marcar el pedido como pagado:', {
+        orderId: order.id,
+        orderNumber: order.order_number,
+        ticket,
+      });
+    }
+
+    return NextResponse.json({
+      approved: true,
+      ticket,
+      orderNumber: order.order_number,
+      total: Number(total.toFixed(2)),
+    });
   } catch (err) {
     console.error('Error cobrando con Kushki:', err);
-    return NextResponse.json({ error: 'GATEWAY_ERROR' }, { status: 502 });
+    return NextResponse.json(
+      {
+        approved: false,
+        error: 'GATEWAY_ERROR',
+        message: 'No pudimos conectar con la pasarela. Intenta de nuevo en un momento.',
+      },
+      { status: 502 }
+    );
   }
 }
