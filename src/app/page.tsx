@@ -9,10 +9,12 @@ import ReviewsSection from '@/components/ReviewsSection';
 import LoyaltySection from '@/components/LoyaltySection';
 import NewsletterSection from '@/components/NewsletterSection';
 import LocationContact from '@/components/LocationContact';
+import PaymentReturnBanner from '@/components/PaymentReturnBanner';
 
 export default function Home() {
   return (
     <>
+      <PaymentReturnBanner />
       <Hero />
       <Marquee
         items={['Crujiente', 'Jugoso', 'Irresistible', '#ElSaborDeTulcán']}

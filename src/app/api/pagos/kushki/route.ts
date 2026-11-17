@@ -97,10 +97,9 @@ export async function POST(req: Request) {
   }
 
   const currency = /^[A-Z]{3}$/.test(String(order.currency || '')) ? String(order.currency) : 'USD';
-  const base =
-    process.env.KUSHKI_ENV === 'production'
-      ? 'https://api.kushkipagos.com'
-      : 'https://api-uat.kushkipagos.com';
+  const isProduction =
+    (process.env.KUSHKI_ENV || process.env.NEXT_PUBLIC_KUSHKI_ENV) === 'production';
+  const base = isProduction ? 'https://api.kushkipagos.com' : 'https://api-uat.kushkipagos.com';
 
   try {
     const res = await fetch(`${base}/card/v1/charges`, {
